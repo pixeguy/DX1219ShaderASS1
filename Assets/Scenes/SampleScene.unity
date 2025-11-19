@@ -197,7 +197,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6acdda2b9fdf8614c8de3119db6e88ba, type: 2}
+  - {fileID: 2100000, guid: 51cc0bf25659e2e40879d5d5a1b1c156, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -818,6 +818,8 @@ GameObject:
   m_Component:
   - component: {fileID: 625417565}
   - component: {fileID: 625417564}
+  - component: {fileID: 625417567}
+  - component: {fileID: 625417566}
   m_Layer: 0
   m_Name: Light (1)
   m_TagString: Untagged
@@ -839,14 +841,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LightObject
   direction: {x: 0, y: -1, z: 0}
   material: {fileID: 2100000, guid: 6acdda2b9fdf8614c8de3119db6e88ba, type: 2}
-  lightColor: {r: 1, g: 0.25471687, b: 0.25471687, a: 0}
+  lightColor: {r: 0.25848654, g: 0.254902, b: 1, a: 0}
   smoothness: 0.497
   specularStrength: 0
-  type: 0
-  intensity: 0
+  type: 1
+  intensity: 5.56
   attenuation: {x: 1, y: 0.09, z: 0.032}
-  spotLightCutOff: 25
-  spotLightInnerCutOff: 17
+  spotLightCutOff: 0
+  spotLightInnerCutOff: 0
 --- !u!4 &625417565
 Transform:
   m_ObjectHideFlags: 0
@@ -856,12 +858,49 @@ Transform:
   m_GameObject: {fileID: 625417563}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -17.19, y: 9.71, z: -24.12}
+  m_LocalPosition: {x: -9.13, y: 17.16, z: -24.12}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &625417566
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 625417563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 778240bb9f337fb4ea21a9c7ef8708ea, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::ShadowMapRenderer
+  lightObject: {fileID: 0}
+  shadowMapResolution: 1024
+  shadowBias: 0.005
+--- !u!114 &625417567
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 625417563}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3cb518ef45ea67b4ebcf6d82c23b42a8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::IndivLightObject
+  direction: {x: 0, y: -1, z: 0}
+  material: {fileID: 2100000, guid: 51cc0bf25659e2e40879d5d5a1b1c156, type: 2}
+  lightColor: {r: 1, g: 0.06132078, b: 0.06132078, a: 0}
+  smoothness: 0.497
+  specularStrength: 0
+  type: 0
+  intensity: 3.84
+  attenuation: {x: 1, y: 0.09, z: 0.032}
+  spotLightCutOff: 0
+  spotLightInnerCutOff: 0
 --- !u!1 &753030773
 GameObject:
   m_ObjectHideFlags: 0
@@ -1217,7 +1256,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6acdda2b9fdf8614c8de3119db6e88ba, type: 2}
+  - {fileID: 2100000, guid: 51cc0bf25659e2e40879d5d5a1b1c156, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1289,21 +1328,21 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 944757646}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 7fd8706f89b5dcf45ad9af861230f392, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::LightObject
   direction: {x: 0, y: -1, z: 0}
   material: {fileID: 2100000, guid: 6acdda2b9fdf8614c8de3119db6e88ba, type: 2}
-  lightColor: {r: 1, g: 0.9787532, b: 0, a: 0}
+  lightColor: {r: 1, g: 0, b: 0.04131365, a: 0}
   smoothness: 0.497
   specularStrength: 0
   type: 0
-  intensity: 4.75
+  intensity: 0
   attenuation: {x: 1, y: 0.09, z: 0.032}
-  spotLightCutOff: 25
-  spotLightInnerCutOff: 17
+  spotLightCutOff: 72
+  spotLightInnerCutOff: 50
 --- !u!4 &944757648
 Transform:
   m_ObjectHideFlags: 0
@@ -1548,7 +1587,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: 6acdda2b9fdf8614c8de3119db6e88ba, type: 2}
+  - {fileID: 2100000, guid: 51cc0bf25659e2e40879d5d5a1b1c156, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -1622,7 +1661,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1376876757
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1630,7 +1669,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1376876756}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ad222b7f4e55f804fa2ca8de2fcddb45, type: 3}
   m_Name: 
@@ -1844,9 +1883,9 @@ SceneRoots:
   - {fileID: 832575519}
   - {fileID: 583817015}
   - {fileID: 753030777}
-  - {fileID: 882339246}
   - {fileID: 1029327655}
   - {fileID: 349593046}
+  - {fileID: 882339246}
   - {fileID: 1067567273}
   - {fileID: 65679579}
   - {fileID: 944757648}

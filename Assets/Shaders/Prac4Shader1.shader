@@ -6,16 +6,16 @@ Properties
         _mainTexture ("Texture",2D) = "white" {}
         _alphaCutoff("Alpha Cutoff", Range(0,1)) = 0.5
         _tiling ("Tiling", Vector) = (1,1,0,0)
-        _lightPosition("Light Position",Vector) = (0,0,0)
-        _lightDirection("Light Direction", Vector) = (0,-1,0)
-        _lightColor("Light Color", Color) = (1,1,1,1)
+        // _lightPosition("Light Position",Vector) = (0,0,0)
+        // _lightDirection("Light Direction", Vector) = (0,-1,0)
+        // _lightColor("Light Color", Color) = (1,1,1,1)
         _smoothness("Smoothness",Range(0,1)) = 0.5
         _specularStrength("Specular Strength", Range(0,1)) = 0.5
-        _lightType("Light Type", float) = 1
-        _lightIntensity("Light Intensity",float) = 1
-        _attenuation("_attenuation", Vector) = (1.0,0.09,0.032)
-        _spotLightCutOff("Spot Light Cut Off", Range(0,360)) = 70.0
-        _spotLightInnerCutOff("Spot Light Inner Cut Off", Range(0,360)) = 25.0
+        // _lightType("Light Type", float) = 1
+        // _lightIntensity("Light Intensity",float) = 1
+        // _attenuation("_attenuation", Vector) = (1.0,0.09,0.032)
+        // _spotLightCutOff("Spot Light Cut Off", Range(0,360)) = 70.0
+        // _spotLightInnerCutOff("Spot Light Inner Cut Off", Range(0,360)) = 25.0
         _lightCounts("Light Counts", Integer) = 2
     }
 
@@ -122,10 +122,12 @@ Properties
                         amountOfLight += 0.2f;
                         }
                     float3 diffuse = albedo.xyz * _lightColor[i].rgb * amountOfLight;
-                    float3 finalColor = (diffuse + specularColor);// * _lightIntensity[i] * attenuation[i];
+                    float3 finalColor = (diffuse + specularColor) * _lightIntensity[i] * attenuation[i];
                     float4 result = float4(finalColor,albedo.w);
                     finalResult += result;
+                    finalResult.a = albedo.a;
                 }
+
                 return finalResult;
             }
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 
-[ExecuteInEditMode]
-public class LightObject : MonoBehaviour
+[ExecuteInEditMode ]
+public class IndivLightObject : MonoBehaviour
 {
     public Vector3 direction = new Vector3(0, -1, 0);
     public Material material;
@@ -20,7 +20,7 @@ public class LightObject : MonoBehaviour
     }
 
     public Type type;
-    [Range(0f,10f)]
+    [Range(0f, 10f)]
     public float intensity;
 
     public Vector3 attenuation = new Vector3(1.0f, 0.09f, 0.032f);
@@ -50,17 +50,17 @@ public class LightObject : MonoBehaviour
 
     private void SendToShader()
     {
-        //material.SetInteger("_lightCounts", allLights.Length);
-        //material.SetVector("_lightPosition", transform.position);
-        //material.SetVector("_lightDirection", direction);
-        //material.SetColor("_lightColor", lightColor);
-        //material.SetFloat("_smoothness", smoothness);
-        //material.SetFloat("_specularStrength", specularStrength);
-        //material.SetInteger("_lightType", (int)type);
-        //material.SetFloat("_lightIntensity", intensity);
-        //material.SetVector("_attenuation", attenuation);
-        //material.SetFloat("_spotLightCutOff", spotLightCutOff);
-        //material.SetFloat("_spotLightInnerCutOff", spotLightInnerCutOff);
+        material.SetInteger("_lightCounts", allLights.Length);
+        material.SetVector("_lightPosition", transform.position);
+        material.SetVector("_lightDirection", direction);
+        material.SetColor("_lightColor", lightColor);
+        material.SetFloat("_smoothness", smoothness);
+        material.SetFloat("_specularStrength", specularStrength);
+        material.SetInteger("_lightType", (int)type);
+        material.SetFloat("_lightIntensity", intensity);
+        material.SetVector("_attenuation", attenuation);
+        material.SetFloat("_spotLightCutOff", spotLightCutOff);
+        material.SetFloat("_spotLightInnerCutOff", spotLightInnerCutOff);
     }
 
     private void OnDrawGizmos()
