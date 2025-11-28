@@ -100,7 +100,7 @@ Material:
     m_Ints:
     - _lightCount: 1
     - _lightCounts: 2
-    - _lightType: 0
+    - _lightType: 1
     m_Floats:
     - _AddPrecomputedVelocity: 0
     - _AlphaClip: 0
@@ -136,12 +136,12 @@ Material:
     - _ZWrite: 1
     - _alphaCutoff: 0.5
     - _lightCount: 0
-    - _lightIntensity: 3.84
+    - _lightIntensity: 5.92
     - _lightType: 1
     - _smoothness: 0.497
     - _specularStrength: 0
-    - _spotLightCutOff: 0
-    - _spotLightInnerCutOff: 0
+    - _spotLightCutOff: 94
+    - _spotLightInnerCutOff: 66
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
@@ -150,7 +150,7 @@ Material:
     - _attenuation: {r: 1, g: 0.09, b: 0.032, a: 0}
     - _lightColor: {r: 1, g: 0.06132078, b: 0.06132078, a: 0}
     - _lightDirection: {r: 0, g: -1, b: 0, a: 0}
-    - _lightPosition: {r: -9.13, g: 17.16, b: -24.12, a: 0}
+    - _lightPosition: {r: -2.45, g: 13.75, b: -25.42, a: 0}
     - _tiling: {r: 1, g: 1, b: 0, a: 0}
     - _tint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []

@@ -17,6 +17,7 @@ Properties
         _spotLightCutOff("Spot Light Cut Off", Range(0,360)) = 70.0
         _spotLightInnerCutOff("Spot Light Inner Cut Off", Range(0,360)) = 25.0
         _lightCounts("Light Counts", Integer) = 2
+        //_shadowCubeMap("cubemap",2D) = "white" {}
     }
 
     SubShader
@@ -52,6 +53,8 @@ Properties
             uniform sampler2D _shadowMap;
             uniform float4x4 _lightViewProj;
             uniform float _shadowBias;
+            uniform samplerCUBE _shadowCubeMap;
+            uniform float _shadowFarPlane;
 
             struct vertexData
             {
@@ -97,6 +100,24 @@ Properties
                 return shadowFactor;
             }
 
+            float PointShadowCalculation(float3 worldPos)
+            {
+                // 1. Vector from light to fragment
+                float3 L = worldPos - _lightPosition;
+
+                // 2. Current distance to fragment
+                float currentDepth = length(L);
+
+                float shadowDepth = 1.0 - texCUBE(_shadowCubeMap, normalize(L/currentDepth)).r;
+                    // 4. Decode depth (stored as [0..1] relative to far plane)
+                shadowDepth *= _shadowFarPlane;
+                float shadowFactor = (currentDepth - _shadowBias > shadowDepth) ? 1.0 : 0.0;
+                //flip the shadowFactor for proper shadowing
+                shadowFactor = saturate(1.0 - shadowFactor);
+
+                return shadowDepth;
+            }
+
             float4 MyFragmentShader(vertex2Fragment v2f) : SV_TARGET
             {
                 float3 finalLightDirection;
@@ -132,6 +153,10 @@ Properties
                     discard;
                 
                 float shadowFactor = ShadowCalculation(v2f.shadowCoord);
+                if (_lightType == 2)
+                {
+                    shadowFactor = PointShadowCalculation(v2f.worldPosition);
+                }
                 float3 viewDirection = normalize(_WorldSpaceCameraPos - v2f.worldPosition);
                 float3 halfVector = normalize(viewDirection + -finalLightDirection);
                 //float specular = floor(pow(float(saturate(dot(v2f.normal, halfVector))), _smoothness * 100) * toonSteps) / toonSteps;
@@ -146,7 +171,7 @@ Properties
                 float3 finalColor = (diffuse + specularColor) * _lightIntensity * attenuation * shadowFactor;
                 float4 result = float4(finalColor,albedo.w);
 
-                return result;
+                return float4(shadowFactor,0,0,1);
             }
 
             ENDHLSL
