@@ -50,17 +50,17 @@ public class IndivLightObject : MonoBehaviour
 
     private void SendToShader()
     {
-        material.SetInteger("_lightCounts", allLights.Length);
-        material.SetVector("_lightPosition", transform.position);
-        material.SetVector("_lightDirection", direction);
-        material.SetColor("_lightColor", lightColor);
-        material.SetFloat("_smoothness", smoothness);
-        material.SetFloat("_specularStrength", specularStrength);
-        material.SetInteger("_lightType", (int)type);
-        material.SetFloat("_lightIntensity", intensity);
-        material.SetVector("_attenuation", attenuation);
-        material.SetFloat("_spotLightCutOff", spotLightCutOff);
-        material.SetFloat("_spotLightInnerCutOff", spotLightInnerCutOff);
+        //material.SetInteger("_lightCounts", allLights.Length);
+        //material.SetVector("_lightPosition", transform.position);
+        //material.SetVector("_lightDirection", direction);
+        //material.SetColor("_lightColor", lightColor);
+        //material.SetFloat("_smoothness", smoothness);
+        //material.SetFloat("_specularStrength", specularStrength);
+        //material.SetInteger("_lightType", (int)type);
+        //material.SetFloat("_lightIntensity", intensity);
+        //material.SetVector("_attenuation", attenuation);
+        //material.SetFloat("_spotLightCutOff", spotLightCutOff);
+        //material.SetFloat("_spotLightInnerCutOff", spotLightInnerCutOff);
     }
 
     private void OnDrawGizmos()

@@ -29,7 +29,7 @@ public class ShadowMapRenderer : MonoBehaviour
     }
     private void Update()
     {
-        if (/*(lightCamera == null || shadowMap == null) || */(pointLightCamera == null || shadowCubeMap == null))
+        if ((lightCamera == null || shadowMap == null)/* || (pointLightCamera == null || shadowCubeMap == null)*/)
             return;
 
         UpdateLightCamera();
@@ -176,6 +176,6 @@ public class ShadowMapRenderer : MonoBehaviour
 
     private void OnGUI()
     {
-        GUI.DrawTexture(new Rect(10, 10, 512, 512),shadowCubeMap, ScaleMode.ScaleToFit, false);
+        GUI.DrawTexture(new Rect(10, 10, 512, 512),shadowMap, ScaleMode.ScaleToFit, false);
     }
 }

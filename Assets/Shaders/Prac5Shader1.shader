@@ -171,7 +171,7 @@ Properties
                 float3 finalColor = (diffuse + specularColor) * _lightIntensity * attenuation * shadowFactor;
                 float4 result = float4(finalColor,albedo.w);
 
-                return float4(shadowFactor,0,0,1);
+                return result;
             }
 
             ENDHLSL
