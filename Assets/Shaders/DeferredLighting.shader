@@ -17,6 +17,7 @@
 
             sampler2D _GBuffer0;  // Albedo + Roughness (A ignored)
             sampler2D _GBuffer1;  // Normal + Metallic (A ignored)
+            sampler2D _GBuffer2; //worldPos
 
             int _LightCount;
 
@@ -82,6 +83,7 @@
                 // --- Read GBuffer ---
                 float4 g0 = tex2D(_GBuffer0, i.uv);
                 float4 g1 = tex2D(_GBuffer1, i.uv);
+                float4 g2 = tex2D(_GBuffer2, i.uv);
 
                 float3 albedo = g0.rgb;
                 float smoothness = g0.a;   // if you stored it
@@ -90,8 +92,8 @@
                 float3 normal = normalize(g1.rgb * 2 - 1);
 
                 // Until we reconstruct from depth
-                float depth = tex2D(_CameraDepthTexture, i.uv).r;
-                float3 worldPos = ReconstructWorldPos(i.uv, depth);
+                //float depth = tex2D(_CameraDepthTexture, i.uv).r;
+                float3 worldPos = g2.xyz;
 
                 float3 finalColor = 0;
 
@@ -121,17 +123,17 @@
                     }
                     else if (type == 1)       // Point
                     {
-                        float3 toLight = worldPos - Lpos;
+                        float3 toLight = Lpos - worldPos;
                         float dist = length(toLight);
 
                         finalLightDir = normalize(toLight);
                         NdotL = saturate(dot(normal, finalLightDir));
 
-                        attenuation = 1.0 / (atten.x + atten.y * dist + atten.z * dist * dist);
+                        attenuation = 1.0;// / (atten.x + atten.y * dist + atten.z * dist * dist);
                     }
                     else if (type == 2)       // Spot
                     {
-                        float3 toLight = worldPos - Lpos;
+                        float3 toLight = Lpos - worldPos;
                         float dist = length(toLight);
 
                         finalLightDir = normalize(toLight);
@@ -145,7 +147,7 @@
                         {
                             float epsilon = cosInner - cosOuter;
                             float intensity = saturate((cosTheta - cosOuter) / epsilon);
-                            attenuation *= intensity;
+                            attenuation *= intensity/2;
                         }
                         else
                         {

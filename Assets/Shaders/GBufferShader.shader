@@ -40,9 +40,9 @@ Shader "Custom/GBufferShader"
             struct Varyings
             {
                 float4 posCS : SV_POSITION;
-                float3 normalWS : TEXCOORD0;
+                float3 normalWS : NORMAL;
                 float2 uv : TEXCOORD1;
-                float3 positionWS : TEXCOORD2;
+                float3 positionWS : POSITION1;
             };
 
             Varyings vert(Attributes v)
@@ -59,6 +59,7 @@ Shader "Custom/GBufferShader"
             {
                 float4 rt0 : SV_Target0; // Albedo + Roughness
                 float4 rt1 : SV_Target1; // Normal + Metallic
+                float4 rt2 : SV_Target2; // World Position
             };
 
             GBufferOutput frag(Varyings i)
@@ -66,10 +67,11 @@ Shader "Custom/GBufferShader"
                 GBufferOutput outData;
 
                 float4 albedo = tex2D(_MainTex, i.uv) * _BaseColor;
-                float3 normal = normalize(i.normalWS);
+                float3 normal = normalize(i.normalWS) * 0.5 + float3(0.5, 0.5, 0.5);
 
                 outData.rt0 = float4(albedo.rgb, _Roughness);
-                outData.rt1 = float4(normal * 0.5 + 0.5, _Metallic);
+                outData.rt1 = float4(normal , _Metallic);
+                outData.rt2 = float4(i.positionWS, 1.0);
 
                 return outData; // or normal, or roughness
             }

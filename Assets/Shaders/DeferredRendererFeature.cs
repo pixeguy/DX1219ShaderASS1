@@ -8,6 +8,8 @@ public class DeferredRendererFeature : RenderPipeline
 {
     private Material gbufferMaterial;
     private Material lightingMaterial;
+    private Material debugBlitMaterial;
+
 
     enum ShadowTextureType
     {
@@ -29,10 +31,11 @@ public class DeferredRendererFeature : RenderPipeline
     ShadowData[] shadowDatas = new ShadowData[32];
     int shadowCount = 0;
 
-    public DeferredRendererFeature(Material gMat, Material lMat)
+    public DeferredRendererFeature(Material gMat, Material lMat, Material dMat)
     {
         gbufferMaterial = gMat;
         lightingMaterial = lMat;
+        debugBlitMaterial = dMat;
         GraphicsSettings.useScriptableRenderPipelineBatching = false;
 
     }
@@ -48,8 +51,6 @@ public class DeferredRendererFeature : RenderPipeline
 
     private void RenderCamera(ScriptableRenderContext context, Camera camera)
     {
-
-
         // CULLING
         if (!camera.TryGetCullingParameters(out var cullParams))
             camera.TryGetCullingParameters(out cullParams); // force fallback
@@ -91,12 +92,14 @@ public class DeferredRendererFeature : RenderPipeline
         // 3. --- CREATE GBuffers + Depth ---
         RenderTexture g0 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
         RenderTexture g1 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
+        RenderTexture g2 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
         RenderTexture depth = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.Depth);
 
         RenderTargetIdentifier[] mrt =
         {
         new RenderTargetIdentifier(g0),
-        new RenderTargetIdentifier(g1)
+        new RenderTargetIdentifier(g1),
+        new RenderTargetIdentifier(g2)
     };
 
 
@@ -182,7 +185,7 @@ public class DeferredRendererFeature : RenderPipeline
         context.DrawRenderers(cullResults, ref drawing, ref filtering);
 
         CommandBufferPool.Release(cmd);
-        context.DrawSkybox(camera);
+        //context.DrawSkybox(camera);
 
 
 
@@ -200,6 +203,7 @@ public class DeferredRendererFeature : RenderPipeline
 
         cmd.SetGlobalTexture("_GBuffer0", g0);
         cmd.SetGlobalTexture("_GBuffer1", g1);
+        cmd.SetGlobalTexture("_GBuffer2", g2);
         cmd.SetGlobalTexture("_CameraDepthTexture", depth);
 
         //Lights 
@@ -269,9 +273,48 @@ public class DeferredRendererFeature : RenderPipeline
         context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
         context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
 
+
+
+
+
+
+
+
+        //cmd = CommandBufferPool.Get("Debug GBuffer View");
+
+        //float fullW = camera.pixelWidth;
+        //float fullH = camera.pixelHeight;
+        //float thirdH = fullH / 3f;
+
+        //// --- GBUFFER 0 (top) ---
+        //cmd.SetViewport(new Rect(0, fullH - thirdH, fullW, thirdH));
+        //cmd.SetGlobalTexture("_SourceTex", g0);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+
+        //// --- GBUFFER 1 (middle) ---
+        //cmd.SetViewport(new Rect(0, fullH - thirdH * 2f, fullW, thirdH));
+        //cmd.SetGlobalTexture("_SourceTex", g1);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+
+        //// --- GBUFFER 2 (bottom) ---
+        //cmd.SetViewport(new Rect(0, 0, fullW, thirdH));
+        //cmd.SetGlobalTexture("_SourceTex", g2);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+
+        //context.ExecuteCommandBuffer(cmd);
+        //CommandBufferPool.Release(cmd);
+
+
+
+
+
+
+
+
         // 6. --- CLEANUP ---
         RenderTexture.ReleaseTemporary(g0);
         RenderTexture.ReleaseTemporary(g1);
+        RenderTexture.ReleaseTemporary(g2);
         RenderTexture.ReleaseTemporary(depth);
 
         context.Submit();

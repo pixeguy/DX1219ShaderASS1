@@ -14,3 +14,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::MyRenderPipeline
   gbufferMaterial: {fileID: 2100000, guid: ba5dacac7f5005c4c9755130d7e1c672, type: 2}
   lightingMaterial: {fileID: 2100000, guid: 5c824ac116f931142b1350f2e47bc7bf, type: 2}
+  debugBlitMaterial: {fileID: 2100000, guid: e36a3e7bbdc477a4c89ee4afbb38644f, type: 2}
