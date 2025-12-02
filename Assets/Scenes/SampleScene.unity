@@ -441,7 +441,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.04584137, y: 0.9538325, z: -0.19672404, w: 0.22226527}
-  m_LocalPosition: {x: -25.1, y: 18.6, z: -1.2}
+  m_LocalPosition: {x: -9.6, y: 13.8, z: -6.2}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -931,13 +931,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 625417563}
   serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -4.472, y: 27, z: -36.6}
+  m_LocalRotation: {x: 0.075030945, y: 0.087866366, z: 0.4920992, w: 0.8628373}
+  m_LocalPosition: {x: -33.7, y: 18.6, z: -30.7}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 2.465, y: 13.043, z: 59.676}
 --- !u!114 &625417566
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -965,16 +965,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3cb518ef45ea67b4ebcf6d82c23b42a8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::IndivLightObject
-  direction: {x: 0, y: -1, z: 0}
+  direction: {x: 0.8360177, y: -0.5044175, z: -0.21595694}
   material: {fileID: 2100000, guid: 7e453cf67da0ee642b138f38fed95752, type: 2}
   lightColor: {r: 1, g: 1, b: 1, a: 0}
   smoothness: 0.1
   specularStrength: 0
-  type: 1
-  intensity: 1
-  attenuation: {x: 1, y: 0.09, z: 0.032}
-  spotLightCutOff: 69
-  spotLightInnerCutOff: 0
+  type: 0
+  intensity: 1.53
+  attenuation: {x: 1, y: 0.027, z: 0.0028}
+  spotLightCutOff: 20
+  spotLightInnerCutOff: 20
 --- !u!1 &753030773
 GameObject:
   m_ObjectHideFlags: 0

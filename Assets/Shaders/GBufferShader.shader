@@ -11,10 +11,12 @@ Shader "Custom/GBufferShader"
     SubShader
     {
 
-        Tags { "RenderType" = "Opaque" "LightMode" = "GBuffer" }
+        Tags { "RenderType" = "Opaque" }
 
         Pass
         {
+            Name "GBuffer"
+            Tags { "LightMode" = "GBuffer" }
             ZWrite On
             ZTest LEqual
             Cull Back
@@ -75,6 +77,46 @@ Shader "Custom/GBufferShader"
 
                 return outData; // or normal, or roughness
             }
+            ENDHLSL
+        }
+
+        Pass
+        {    
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 posCS : SV_POSITION;
+            };
+
+            Varyings vert(Attributes v)
+            {
+                Varyings o;
+                o.posCS = UnityObjectToClipPos(v.positionOS);
+                return o;
+            }
+
+            // Output DEPTH, not color
+            float frag(Varyings i) : SV_Depth
+            {
+                return i.posCS.z / i.posCS.w;    // hardware depth
+            }
+
             ENDHLSL
         }
     }

@@ -31,6 +31,10 @@
             float4 _LightSpecularStrength[32]; // x = specularStrength
             float4 _LightSmoothness[32];       // x = smoothness
 
+            // sampler2D _ShadowMap;
+            // UNITY_DECLARE_DEPTH_TEXTURE(_ShadowMap);
+            // float4x4 _LightVP;
+
             sampler2D _CameraDepthTexture;
             float4x4 _CameraInverseProjection;   // from C#
             float4x4 _CameraInverseView;         // from C#
@@ -78,6 +82,33 @@
                 return worldPos.xyz;
             }
 
+            // float4 ComputeShadowCoord(float3 worldPos)
+            // {
+            //     float4 posLS = mul(_LightVP, float4(worldPos, 1.0)); // light clip-space
+            //     posLS.xyz /= posLS.w;
+    
+            //     // Convert from clip [-1,1] to UV [0,1]
+            //     float2 uv = posLS.xy * 0.5 + 0.5;
+            //     float depth = posLS.z * 0.5 + 0.5;
+
+            //     return float4(uv, depth, 1.0);
+            // }
+
+            // float SampleShadow(float3 worldPos)
+            // {
+            //     float4 sc = ComputeShadowCoord(worldPos);
+            //     float2 uv = sc.xy;
+            //     float  fragmentDepth = sc.z;
+
+            //     // outside shadow map? return lit
+            //     if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
+            //         return 1.0;
+
+            //     float shadowDepth = SAMPLE_DEPTH_TEXTURE(_ShadowMap, uv);
+
+            //     return fragmentDepth - 0.001f > shadowDepth ? 0.0 : 1.0;
+            // }
+
             float4 Frag(Varyings i) : SV_Target
             {
                 // --- Read GBuffer ---
@@ -115,52 +146,61 @@
                     float attenuation = 1.0;
                     float NdotL = 0;
 
+                    float shadow = 1.0;
+
                     if (type == 0)            // Directional
                     {
                         finalLightDir = -Ldir;
                         attenuation = 1;
-                        NdotL = saturate(dot(normal, finalLightDir));
+                        NdotL = saturate(dot(normal, finalLightDir));   
+                        //shadow = SampleShadow(worldPos);
                     }
                     else if (type == 1)       // Point
                     {
-                        float3 toLight = Lpos - worldPos;
+                        float3 toLight = Lpos - worldPos;   // FIXED
                         float dist = length(toLight);
 
-                        finalLightDir = normalize(toLight);
+                        finalLightDir = normalize(toLight); // FIXED
                         NdotL = saturate(dot(normal, finalLightDir));
 
-                        attenuation = 1.0;// / (atten.x + atten.y * dist + atten.z * dist * dist);
+                        attenuation = 1.0 / (atten.x + atten.y * dist + atten.z * dist * dist);
                     }
                     else if (type == 2)       // Spot
                     {
-                        float3 toLight = Lpos - worldPos;
-                        float dist = length(toLight);
+                            // from light to fragment
+                        float3 toFrag = worldPos - Lpos;
+                        float dist = length(toFrag);
+                        float3 dirToFrag = normalize(toFrag);
 
-                        finalLightDir = normalize(toLight);
+                        // light forward direction (from your C#)
+                        float3 Lfwd = normalize(Ldir);   // make sure C# sets this as transform.forward
 
-                        // Spot angle falloff
-                        float cosTheta = dot(finalLightDir, -Ldir);
+                        // angle between spotlight forward and direction to fragment
+                        float cosTheta = dot(Lfwd, dirToFrag);
+
                         float cosOuter = cos(outer);
                         float cosInner = cos(inner);
 
-                        if (cosTheta > cosOuter)
+                        // smooth falloff between inner and outer cone
+                        float spotFactor = saturate((cosTheta - cosOuter) / (cosInner - cosOuter));
+
+                        if (cosTheta <= cosOuter)
                         {
-                            float epsilon = cosInner - cosOuter;
-                            float intensity = saturate((cosTheta - cosOuter) / epsilon);
-                            attenuation *= intensity/2;
-                        }
-                        else
-                        {
-                            // outside outer cone
+                            // fully outside cone: no contribution from THIS light
                             attenuation = 0;
+                            NdotL = 0;
+                            continue;  // IMPORTANT: don't break, we still want other lights to run
                         }
 
-                        //float spotFactor = saturate((cosTheta - cosOuter) / (cosInner - cosOuter));
+                        // distance attenuation
+                        float distAtten = 1.0 / (atten.x + atten.y * dist + atten.z * dist * dist);
 
-                        NdotL = saturate(dot(normal, finalLightDir));
+                        // total attenuation
+                        attenuation = distAtten * spotFactor;
 
-                        //float dAtten = 1.0 / (atten.x + atten.y * dist + atten.z * dist * dist);
-                        //attenuation = dAtten * spotFactor;
+                        // for Lambert/Blinn–Phong we need surface -> light
+                        float3 lightDir = normalize(Lpos - worldPos);   // fragment -> light
+                        NdotL = saturate(dot(normal, lightDir));
                     }
 
                     // --- Specular (Blinn-Phong) ---
@@ -171,7 +211,7 @@
                     float LspecStrength = _LightSpecularStrength[idx].x;
 
                     float spec = pow(saturate(dot(normal, halfVec)), Lsmooth * 100);
-                    float3 specCol = spec * LspecStrength * Lcolor;
+                    float3 specCol = spec * LspecStrength * Lcolor* shadow;
 
                     if (NdotL <= 0.05f)
                     {
@@ -179,7 +219,7 @@
                         }
 
                     // --- Diffuse ---
-                    float3 diffuse = albedo * Lcolor * NdotL;
+                    float3 diffuse = albedo * Lcolor * NdotL * shadow;
 
                     // --- Sum light ---
                     finalColor += (diffuse + specCol) * Lintens * attenuation;

@@ -44,7 +44,6 @@ public class DeferredRendererFeature : RenderPipeline
     {
         foreach (var cam in cameras)
         {
-            Debug.Log("SRP rendering camera: " + cam.name + "  (" + cam.cameraType + ")");
             RenderCamera(context, cam);
         }
     }
@@ -60,16 +59,17 @@ public class DeferredRendererFeature : RenderPipeline
 #if UNITY_EDITOR
         if (camera.cameraType == CameraType.SceneView)
         {
+            // IMPORTANT: setup camera props first
+            context.SetupCameraProperties(camera);
+
             ScriptableRenderContext.EmitWorldGeometryForSceneView(camera);
 
-            // Forward fallback for SceneView
             var sceneSorting = new SortingSettings(camera) { criteria = SortingCriteria.CommonOpaque };
-            var sceneDrawing = new DrawingSettings(new ShaderTagId("UniversalForward"), sceneSorting);
-            var sceneFiltering = new FilteringSettings(RenderQueueRange.all);
+            var sceneDrawing = new DrawingSettings(new ShaderTagId("GBuffer"), sceneSorting);
+            var sceneFiltering = new FilteringSettings(RenderQueueRange.opaque);
 
             context.DrawRenderers(cullResults, ref sceneDrawing, ref sceneFiltering);
 
-            // Skybox and gizmos
             context.DrawSkybox(camera);
             context.DrawGizmos(camera, GizmoSubset.PreImageEffects);
             context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
@@ -78,6 +78,7 @@ public class DeferredRendererFeature : RenderPipeline
             return;
         }
 #endif
+
         RenderTargetIdentifier camTarget =
     camera.targetTexture != null
         ? new RenderTargetIdentifier(camera.targetTexture)
@@ -92,7 +93,7 @@ public class DeferredRendererFeature : RenderPipeline
         // 3. --- CREATE GBuffers + Depth ---
         RenderTexture g0 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
         RenderTexture g1 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
-        RenderTexture g2 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGB32);
+        RenderTexture g2 = RenderTexture.GetTemporary(w, h, 0, RenderTextureFormat.ARGBHalf);
         RenderTexture depth = RenderTexture.GetTemporary(w, h, 24, RenderTextureFormat.Depth);
 
         RenderTargetIdentifier[] mrt =
@@ -120,49 +121,60 @@ public class DeferredRendererFeature : RenderPipeline
         Vector4[] smoothnessValues = new Vector4[32];
 
         CommandBuffer cmd = CommandBufferPool.Get("ShadowPass");
-        //shadow
+
+        shadowCount = 0;
+
+        for (int i = 0; i < indivLights.Length; i++)
         {
-            //shadowCount = 0;
+            var L = indivLights[i];
+            if (L.type != IndivLightObject.Type.direction) continue;
 
-            //for (int i = 0; i < indivLights.Length; i++) //only render directional shadows for now
-            //{
-            //    var L = indivLights[i];
+            // Create depth shadow map
+            var rt = new RenderTexture(2048, 2048, 32, RenderTextureFormat.Depth);
+            rt.filterMode = FilterMode.Bilinear;
+            rt.wrapMode = TextureWrapMode.Clamp;
+            rt.Create();
 
-            //    if (L.type != IndivLightObject.Type.direction) continue;
+            // Build VP from light POV
+            float3 pos = L.transform.position;
+            float3 dir = L.direction.normalized;
+            float3 up = Vector3.up;
 
-            //    // --- Create shadow texture ---
-            //    var rt = new RenderTexture(2048, 2048, 32, RenderTextureFormat.Depth);
-            //    rt.filterMode = FilterMode.Bilinear;
+            Matrix4x4 view = Matrix4x4.LookAt(pos, pos + dir, up);
+            Matrix4x4 proj = Matrix4x4.Ortho(-50, 50, -50, 50, 0.1f, 200f);
+            Matrix4x4 vp = proj * view;
 
-            //    // --- Build view + projection ---
-            //    float3 pos = L.transform.position;
-            //    float3 dir = L.direction.normalized; // your custom vector
-            //    float3 up = Vector3.up;
+            shadowDatas[shadowCount].shadowTex = rt;
+            shadowDatas[shadowCount].lightVP = vp;
 
-            //    Matrix4x4 view = Matrix4x4.LookAt(pos, pos + dir, up);
-            //    Matrix4x4 proj = Matrix4x4.Ortho(-50, 50, -50, 50, 0.1f, 200f);
+            // Bind depth-only target
+            cmd.SetRenderTarget(rt);
+            cmd.ClearRenderTarget(true, false, Color.clear);
 
-            //    Matrix4x4 vp = proj * view;
+            // MUST EXECUTE this before DrawRenderers
+            context.ExecuteCommandBuffer(cmd);
+            cmd.Clear();
 
-            //    // --- Fill shadowData ---
-            //    shadowDatas[shadowCount].type = ShadowTextureType.Shadow2D;
-            //    shadowDatas[shadowCount].shadowTex = rt;
-            //    shadowDatas[shadowCount].lightVP = vp;
+            // Draw all objects using ShadowCaster pass
+            var sort = new SortingSettings(camera);
+            var draw = new DrawingSettings(new ShaderTagId("ShadowCaster"), sort);
+            var filter = new FilteringSettings(RenderQueueRange.opaque);
 
-            //    // --- Render depth map ---
-            //    cmd.SetRenderTarget(rt);
-            //    cmd.ClearRenderTarget(true, true, Color.white);
+            context.DrawRenderers(cullResults, ref draw, ref filter);
 
-            //    var shadowSort = new SortingSettings(camera);
-            //    var shadowDraw = new DrawingSettings(new ShaderTagId("ShadowCaster"), shadowSort);
-            //    var shadowFilter = new FilteringSettings(RenderQueueRange.opaque);
-
-            //    context.DrawRenderers(cullResults, ref shadowDraw, ref shadowFilter);
-
-            //    shadowCount++;
-            //}
+            shadowCount++;
         }
 
+        // Set texture + matrix
+        if (shadowCount > 0)
+        {
+            cmd.SetGlobalTexture("_ShadowMap", shadowDatas[0].shadowTex);
+            cmd.SetGlobalMatrix("_LightVP", shadowDatas[0].lightVP);
+        }
+
+        // Execute and release
+        context.ExecuteCommandBuffer(cmd);
+        CommandBufferPool.Release(cmd);
 
 
         cmd = CommandBufferPool.Get("GBufferPass");
@@ -186,9 +198,6 @@ public class DeferredRendererFeature : RenderPipeline
 
         CommandBufferPool.Release(cmd);
         //context.DrawSkybox(camera);
-
-
-
 
 
 
@@ -248,7 +257,7 @@ public class DeferredRendererFeature : RenderPipeline
 
         // render to the camera target
         cmd.SetRenderTarget(camTarget);
-        cmd.ClearRenderTarget(true, true, Color.blue);
+        cmd.ClearRenderTarget(true, true, Color.black);
 
         // Fullscreen triangle (no Blit)
         cmd.DrawProcedural(
@@ -298,8 +307,8 @@ public class DeferredRendererFeature : RenderPipeline
 
         //// --- GBUFFER 2 (bottom) ---
         //cmd.SetViewport(new Rect(0, 0, fullW, thirdH));
-        //cmd.SetGlobalTexture("_SourceTex", g2);
-        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+        //cmd.SetGlobalTexture("_SourceTex", shadowDatas[0].shadowTex);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3);
 
         //context.ExecuteCommandBuffer(cmd);
         //CommandBufferPool.Release(cmd);
