@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.Rendering;
+using UnityEngine.UIElements;
 
 public class DeferredRendererFeature : RenderPipeline
 {
@@ -123,14 +124,13 @@ public class DeferredRendererFeature : RenderPipeline
         CommandBuffer cmd = CommandBufferPool.Get("ShadowPass");
 
         shadowCount = 0;
-
         for (int i = 0; i < indivLights.Length; i++)
         {
             var L = indivLights[i];
             if (L.type != IndivLightObject.Type.direction) continue;
 
-            // Create depth shadow map
-            var rt = new RenderTexture(2048, 2048, 32, RenderTextureFormat.Depth);
+            var rt = new RenderTexture(2048, 2048, 0, RenderTextureFormat.RFloat);
+
             rt.filterMode = FilterMode.Bilinear;
             rt.wrapMode = TextureWrapMode.Clamp;
             rt.Create();
@@ -140,8 +140,16 @@ public class DeferredRendererFeature : RenderPipeline
             float3 dir = L.direction.normalized;
             float3 up = Vector3.up;
 
-            Matrix4x4 view = Matrix4x4.LookAt(pos, pos + dir, up);
-            Matrix4x4 proj = Matrix4x4.Ortho(-50, 50, -50, 50, 0.1f, 200f);
+            // Choose a point in the scene we care about (around the camera)
+            float3 lightPos = pos;
+                
+            float dist = 50f;
+            float3 nextPos = lightPos + dir * dist;
+
+            // Build view from light
+            Matrix4x4 view = Matrix4x4.LookAt(lightPos, lightPos + new float3(0,1,0), Vector3.down);
+            float halfSize = 90f;
+            Matrix4x4 proj = Matrix4x4.Ortho(-halfSize, halfSize, -halfSize, halfSize, 0.1f, dist);
             Matrix4x4 vp = proj * view;
 
             shadowDatas[shadowCount].shadowTex = rt;
@@ -150,21 +158,24 @@ public class DeferredRendererFeature : RenderPipeline
             // Bind depth-only target
             cmd.SetRenderTarget(rt);
             cmd.ClearRenderTarget(true, false, Color.clear);
+            cmd.SetGlobalMatrix("_LightVP", vp);
+            cmd.SetGlobalVector("_LightPos", L.transform.position);
+            cmd.SetGlobalMatrix("_LightView", view);
 
             // MUST EXECUTE this before DrawRenderers
             context.ExecuteCommandBuffer(cmd);
             cmd.Clear();
 
+
             // Draw all objects using ShadowCaster pass
             var sort = new SortingSettings(camera);
             var draw = new DrawingSettings(new ShaderTagId("ShadowCaster"), sort);
-            var filter = new FilteringSettings(RenderQueueRange.opaque);
+            var filter = new FilteringSettings(RenderQueueRange.all);
 
             context.DrawRenderers(cullResults, ref draw, ref filter);
 
             shadowCount++;
         }
-
         // Set texture + matrix
         if (shadowCount > 0)
         {
@@ -176,7 +187,8 @@ public class DeferredRendererFeature : RenderPipeline
         context.ExecuteCommandBuffer(cmd);
         CommandBufferPool.Release(cmd);
 
-
+        //Debug.Log(count);
+        
         cmd = CommandBufferPool.Get("GBufferPass");
 
         // Make sure viewport covers the full camera
@@ -283,35 +295,29 @@ public class DeferredRendererFeature : RenderPipeline
         context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
 
 
+        cmd = CommandBufferPool.Get("Debug GBuffer View");
 
+        float fullW = camera.pixelWidth;
+        float fullH = camera.pixelHeight;
+        float thirdH = fullH / 3f;
 
+        // --- GBUFFER 0 (top) ---
+        cmd.SetViewport(new Rect(0, fullH - thirdH, fullW/2, thirdH));
+        cmd.SetGlobalTexture("_SourceTex", g0);
+        cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
 
+        // --- GBUFFER 1 (middle) ---
+        cmd.SetViewport(new Rect(0, fullH - thirdH * 2f, fullW/2, thirdH));
+        cmd.SetGlobalTexture("_SourceTex", g1);
+        cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
 
+        // --- GBUFFER 2 (bottom) ---
+        cmd.SetViewport(new Rect(0, 0, fullW / 2, thirdH));
+        cmd.SetGlobalTexture("_SourceTex", shadowDatas[0].shadowTex);
+        cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1 );
 
-
-        //cmd = CommandBufferPool.Get("Debug GBuffer View");
-
-        //float fullW = camera.pixelWidth;
-        //float fullH = camera.pixelHeight;
-        //float thirdH = fullH / 3f;
-
-        //// --- GBUFFER 0 (top) ---
-        //cmd.SetViewport(new Rect(0, fullH - thirdH, fullW, thirdH));
-        //cmd.SetGlobalTexture("_SourceTex", g0);
-        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
-
-        //// --- GBUFFER 1 (middle) ---
-        //cmd.SetViewport(new Rect(0, fullH - thirdH * 2f, fullW, thirdH));
-        //cmd.SetGlobalTexture("_SourceTex", g1);
-        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
-
-        //// --- GBUFFER 2 (bottom) ---
-        //cmd.SetViewport(new Rect(0, 0, fullW, thirdH));
-        //cmd.SetGlobalTexture("_SourceTex", shadowDatas[0].shadowTex);
-        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3);
-
-        //context.ExecuteCommandBuffer(cmd);
-        //CommandBufferPool.Release(cmd);
+        context.ExecuteCommandBuffer(cmd);
+        CommandBufferPool.Release(cmd);
 
 
 

@@ -31,9 +31,8 @@
             float4 _LightSpecularStrength[32]; // x = specularStrength
             float4 _LightSmoothness[32];       // x = smoothness
 
-            // sampler2D _ShadowMap;
-            // UNITY_DECLARE_DEPTH_TEXTURE(_ShadowMap);
-            // float4x4 _LightVP;
+            sampler2D _ShadowMap;
+            float4x4 _LightVP;
 
             sampler2D _CameraDepthTexture;
             float4x4 _CameraInverseProjection;   // from C#
@@ -82,32 +81,21 @@
                 return worldPos.xyz;
             }
 
-            // float4 ComputeShadowCoord(float3 worldPos)
-            // {
-            //     float4 posLS = mul(_LightVP, float4(worldPos, 1.0)); // light clip-space
-            //     posLS.xyz /= posLS.w;
-    
-            //     // Convert from clip [-1,1] to UV [0,1]
-            //     float2 uv = posLS.xy * 0.5 + 0.5;
-            //     float depth = posLS.z * 0.5 + 0.5;
+            float ShadowCalculation(float3 fragPosLightSpace)
+            {
+                //transform shadow coordinates
+                float3 shadowCoord = fragPosLightSpace.xyz;
+                //trnasform from clip space to Texture
+                shadowCoord = shadowCoord * 0.5 + 0.5;
+                
+                //sample shadow map
+                float shadowDepth = 1.0 - tex2D(_ShadowMap, shadowCoord.xy).r;
+                float shadowFactor = (shadowCoord.z - 0.0003 > shadowDepth) ? 1.0 : 0.0;
+                //flip the shadowFactor for proper shadowing
+                shadowFactor = saturate(1.0 - shadowFactor);
 
-            //     return float4(uv, depth, 1.0);
-            // }
-
-            // float SampleShadow(float3 worldPos)
-            // {
-            //     float4 sc = ComputeShadowCoord(worldPos);
-            //     float2 uv = sc.xy;
-            //     float  fragmentDepth = sc.z;
-
-            //     // outside shadow map? return lit
-            //     if (uv.x < 0 || uv.x > 1 || uv.y < 0 || uv.y > 1)
-            //         return 1.0;
-
-            //     float shadowDepth = SAMPLE_DEPTH_TEXTURE(_ShadowMap, uv);
-
-            //     return fragmentDepth - 0.001f > shadowDepth ? 0.0 : 1.0;
-            // }
+                return shadowFactor;
+            }
 
             float4 Frag(Varyings i) : SV_Target
             {
@@ -146,7 +134,11 @@
                     float attenuation = 1.0;
                     float NdotL = 0;
 
-                    float shadow = 1.0;
+                    float4 worldPos4 = float4(worldPos, 1.0);
+
+                    // Transform into light clip space
+                    float4 lightClip = mul(_LightVP, worldPos);
+                    float shadowFactor = ShadowCalculation(lightClip);
 
                     if (type == 0)            // Directional
                     {
@@ -211,7 +203,7 @@
                     float LspecStrength = _LightSpecularStrength[idx].x;
 
                     float spec = pow(saturate(dot(normal, halfVec)), Lsmooth * 100);
-                    float3 specCol = spec * LspecStrength * Lcolor* shadow;
+                    float3 specCol = spec * LspecStrength * Lcolor * shadowFactor;
 
                     if (NdotL <= 0.05f)
                     {
@@ -219,7 +211,7 @@
                         }
 
                     // --- Diffuse ---
-                    float3 diffuse = albedo * Lcolor * NdotL * shadow;
+                    float3 diffuse = albedo * Lcolor * NdotL * shadowFactor;
 
                     // --- Sum light ---
                     finalColor += (diffuse + specCol) * Lintens * attenuation;

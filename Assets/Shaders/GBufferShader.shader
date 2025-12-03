@@ -15,6 +15,56 @@ Shader "Custom/GBufferShader"
 
         Pass
         {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            ZWrite On
+            ZTest LEqual
+            Cull Back
+
+            HLSLPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #include "UnityCG.cginc"
+
+            float4x4 _LightVP;
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+            };
+
+            struct Varyings
+            {
+                float4 posCS    : SV_POSITION; // light clip-space (for raster)
+                float4 lightCS  : TEXCOORD0;   // store clip pos to compute depth
+            };
+
+            Varyings vert(Attributes v)
+            {
+                Varyings o;
+                float4 worldPos = mul(unity_ObjectToWorld, v.positionOS);
+
+                float4 lightCS = mul(_LightVP, worldPos);
+   
+                o.posCS   = lightCS;    // rasterize from light POV
+                o.lightCS = lightCS;    // keep for depth
+
+                return o;
+            }
+
+            float4 frag(Varyings i) : SV_Target
+            {
+                float depth = i.lightCS.z / i.lightCS.w;   // [-1..1]
+                depth = depth * 0.5 + 0.5;                 // [0..1]
+                return float4(depth,depth,depth,1);
+                //return depth;                              // RFloat: just one channel
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
             Name "GBuffer"
             Tags { "LightMode" = "GBuffer" }
             ZWrite On
@@ -80,44 +130,6 @@ Shader "Custom/GBufferShader"
             ENDHLSL
         }
 
-        Pass
-        {    
-            Name "ShadowCaster"
-            Tags { "LightMode" = "ShadowCaster" }
 
-            ZWrite On
-            ZTest LEqual
-            Cull Back
-
-            HLSLPROGRAM
-            #pragma vertex vert
-            #pragma fragment frag
-            #include "UnityCG.cginc"
-
-            struct Attributes
-            {
-                float4 positionOS : POSITION;
-            };
-
-            struct Varyings
-            {
-                float4 posCS : SV_POSITION;
-            };
-
-            Varyings vert(Attributes v)
-            {
-                Varyings o;
-                o.posCS = UnityObjectToClipPos(v.positionOS);
-                return o;
-            }
-
-            // Output DEPTH, not color
-            float frag(Varyings i) : SV_Depth
-            {
-                return i.posCS.z / i.posCS.w;    // hardware depth
-            }
-
-            ENDHLSL
-        }
     }
 }

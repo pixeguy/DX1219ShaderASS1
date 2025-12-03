@@ -34,7 +34,8 @@ Shader "Custom/DebugGBuffer"
 
             float4 Frag(V i) : SV_Target
             {
-                return tex2D(_SourceTex, i.uv);
+                float v = tex2D(_SourceTex, i.uv).r;
+                return float4(v, v, v, 1);
             }
             ENDHLSL
         }
