@@ -1,4 +1,4 @@
-Shader "Custom/Prac5Shader1"
+﻿Shader "Custom/WaterShader2"
 {
     Properties
     {       
@@ -10,22 +10,26 @@ Shader "Custom/Prac5Shader1"
         _smoothness("Smoothness",Range(0,1)) = 0.5
         _specularStrength("Specular Strength", Range(0,1)) = 0.5
         //_lightCounts("Light Counts", Integer) = 2
-        _NoiseTex ("Noise texture", 2D) = "white" {}
+        _shallowColor("Shallow Color", Color) = (0.2, 0.7, 0.9, 1)
+        _deepColor("Deep Color", Color) = (0.0, 0.02, 0.1, 1)
+        _MaxDepth("Max Depth", Float) = 10
+        _horizonColor("Horizon Color", Color) = (0.0, 0.02, 0.1, 1)
+        _horizonPower("Fresnel Power", Range(0.1, 10)) = 5
     }
     
     SubShader
     {
-         
-        Tags {"Queue" = "Geometry" "RenderType" = "Transparent"}
+        
+        Tags {"Queue" = "Transparent" "RenderType" = "Transparent"}
+        //ZWrite Off
         Blend SrcAlpha OneMinusSrcAlpha
         Pass
         {
             HLSLPROGRAM
             #include "UnityCG.cginc"
-
+            
             #pragma vertex MyVertexShader
             #pragma fragment MyFragmentShader
-
 
             uniform float4 _tint;
             uniform sampler2D _mainTexture;
@@ -54,6 +58,13 @@ Shader "Custom/Prac5Shader1"
             uniform samplerCUBE _shadowCubeMap;
             uniform float _shadowFarPlane;
 
+            UNITY_DECLARE_DEPTH_TEXTURE(_CameraDepthTexture);
+            float4 _shallowColor;
+            float4 _deepColor;
+            float4 _horizonColor;
+            float _MaxDepth;
+            float _horizonPower;
+
             struct vertexData
             {
                 float4 position: POSITION;
@@ -69,6 +80,8 @@ Shader "Custom/Prac5Shader1"
                 float3 normalWorld        : TEXCOORD1;
                 float3 tangentWorld       : TEXCOORD2;
                 float3 bitangentWorld     : TEXCOORD3;
+                float4 screenPos : TEXCOORD4; 
+                float waterEyeZ : TEXCOORD5;
                 float3 worldPosition : POSITION1;
                 float4 shadowCoord: POSITION2;
             };
@@ -81,7 +94,7 @@ Shader "Custom/Prac5Shader1"
                 v2f.uv = TRANSFORM_TEX(vd.uv, _mainTexture);
                 v2f.shadowCoord = mul(_lightViewProj, float4(v2f.worldPosition, 1.0));
 
-                                //normal mapping
+                //normal mapping
                 float3 normalWS  = UnityObjectToWorldNormal(vd.normal);
                 float3 tangentWS = UnityObjectToWorldDir(vd.tangent.xyz);
                 float tangentSign = vd.tangent.w * unity_WorldTransformParams.w;
@@ -90,6 +103,10 @@ Shader "Custom/Prac5Shader1"
                 v2f.normalWorld  = normalWS;
                 v2f.tangentWorld = tangentWS;
                 v2f.bitangentWorld   = bitangentWS;
+
+                v2f.screenPos = ComputeScreenPos(v2f.position);
+                float3 viewPos = mul(UNITY_MATRIX_MV, vd.position).xyz;
+                v2f.waterEyeZ = -viewPos.z;
                 return v2f;
             }
 
@@ -109,24 +126,7 @@ Shader "Custom/Prac5Shader1"
 
                 return shadowFactor;
             }
-            
-            float PointShadowCalculation(float3 worldPos)
-            {
-                // 1. Vector from light to fragment
-                float3 L = worldPos - _lightPosition;
 
-                // 2. Current distance to fragment
-                float currentDepth = length(L);
-
-                float shadowDepth = 1.0 - texCUBE(_shadowCubeMap, normalize(L/currentDepth)).r;
-                    // 4. Decode depth (stored as [0..1] relative to far plane)
-                shadowDepth *= _shadowFarPlane;
-                float shadowFactor = (currentDepth - _shadowBias > shadowDepth) ? 1.0 : 0.0;
-                //flip the shadowFactor for proper shadowing
-                shadowFactor = saturate(1.0 - shadowFactor);
-
-                return shadowDepth;
-            }
             float4 MyFragmentShader(vertex2Fragment v2f) : SV_TARGET
             {
                 float3 normalTS = UnpackNormal(tex2D(_normalTex,v2f.uv));
@@ -161,8 +161,51 @@ Shader "Custom/Prac5Shader1"
                     }
                 }
 
+
+                // depth based on world space, doesnt change based on camera pos
+                // Eye space depth
+                float rawDepth      = UNITY_SAMPLE_DEPTH(tex2Dproj(_CameraDepthTexture, UNITY_PROJ_COORD(v2f.screenPos)));
+                float sceneDepthEye = LinearEyeDepth(rawDepth);
+                float waterColumn   = max(0.0, sceneDepthEye - v2f.waterEyeZ);  // distance along view ray
+
+                // view direction in world psace
+                float3 viewDirWS = normalize(v2f.worldPosition - _WorldSpaceCameraPos.xyz);
+
+                // water normal
+                float3 waterNormalWS = normalize(v2f.normalWorld);  
+
+                // convert ray to vertical distance
+                float angleFactor       = abs(dot(viewDirWS, waterNormalWS)); 
+                float waterColumnVertical = waterColumn * angleFactor;       
+
+                // use vert distance for color falloff
+                float depthFactor = exp(-waterColumnVertical / _MaxDepth); 
+                depthFactor = saturate(depthFactor);
+
+                // if 0 = shallow, 1 = deep:
+                float t = 1.0 - depthFactor;
+
+                float4 waterCol = lerp(_shallowColor, _deepColor, t);
+                waterCol.a = 1.0;
+                float horizonFactor = 1.0 - saturate(dot(normalWS, -viewDirWS));
+
+                float fresnelMask = pow(horizonFactor, _horizonPower);
+                fresnelMask = saturate(fresnelMask); 
+
+                float4 horizonCol = lerp(waterCol, _horizonColor,fresnelMask);
+
+                // float4 sceneColor = tex2Dproj(_WaterSceneColor, UNITY_PROJ_COORD(v2f.screenPos));
+                // float3 sceneRGB   = sceneColor.rgb;
+
+                // float3 underwaterCol = (1 - horizonCol.x) * sceneRGB;
+
+                float4 finalCol = horizonCol ;//+ float4(underwaterCol,1);
+
+
+
+
                 float toonSteps = 2;
-                float4 albedo = _tint * tex2D(_mainTexture, v2f.uv);
+                float4 albedo = finalCol;//* tex2D(_mainTexture, v2f.uv);
 
                 normalWS = normalize(normalWS);
                 if(albedo.a < _alphaCutoff)

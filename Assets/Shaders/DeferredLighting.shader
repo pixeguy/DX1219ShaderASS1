@@ -63,39 +63,26 @@
                 return o;
             }
 
-            float3 ReconstructWorldPos(float2 uv, float depth)
+            float ShadowCalculation(float4 fragPosLightSpace)
             {
-                // Convert depth from [0,1] to clip space
-                float4 clipPos;
-                clipPos.xy = uv * 2.0 - 1.0;
-                clipPos.z = depth * 2.0 - 1.0;
-                clipPos.w = 1.0;
-
-                // View space
-                float4 viewPos = mul(_CameraInverseProjection, clipPos);
-                viewPos /= viewPos.w;
-
-                // World space
-                float4 worldPos = mul(_CameraInverseView, viewPos);
-
-                return worldPos.xyz;
-            }
-
-            float ShadowCalculation(float3 fragPosLightSpace)
-            {
-                //transform shadow coordinates
-                float3 shadowCoord = fragPosLightSpace.xyz;
-                //trnasform from clip space to Texture
+                float3 shadowCoord = fragPosLightSpace.xyz / fragPosLightSpace.w;
                 shadowCoord = shadowCoord * 0.5 + 0.5;
-                
-                //sample shadow map
-                float shadowDepth = 1.0 - tex2D(_ShadowMap, shadowCoord.xy).r;
-                float shadowFactor = (shadowCoord.z - 0.0003 > shadowDepth) ? 1.0 : 0.0;
-                //flip the shadowFactor for proper shadowing
-                shadowFactor = saturate(1.0 - shadowFactor);
 
-                return shadowFactor;
+                if (shadowCoord.x < 0.0 || shadowCoord.x > 1.0 ||
+                    shadowCoord.y < 0.0 || shadowCoord.y > 1.0 ||
+                    shadowCoord.z < 0.0 || shadowCoord.z > 1.0)
+                {
+                    return 1.0; // outside light frustum -> lit
+                }
+
+                float shadowDepth = tex2D(_ShadowMap, shadowCoord.xy).r;
+
+                float shadowFactor = (shadowCoord.z - 0.003 > shadowDepth) ? 0.0 : 1.0;
+
+                return saturate(shadowFactor);
             }
+
+
 
             float4 Frag(Varyings i) : SV_Target
             {
@@ -145,7 +132,10 @@
                         finalLightDir = -Ldir;
                         attenuation = 1;
                         NdotL = saturate(dot(normal, finalLightDir));   
-                        //shadow = SampleShadow(worldPos);
+                        
+                        float4 worldPos4 = float4(worldPos, 1.0);
+                        float4 lightClip = mul(_LightVP, worldPos4);
+                        shadowFactor = ShadowCalculation(lightClip);
                     }
                     else if (type == 1)       // Point
                     {
@@ -203,7 +193,7 @@
                     float LspecStrength = _LightSpecularStrength[idx].x;
 
                     float spec = pow(saturate(dot(normal, halfVec)), Lsmooth * 100);
-                    float3 specCol = spec * LspecStrength * Lcolor * shadowFactor;
+                    float3 specCol = spec * LspecStrength * Lcolor;
 
                     if (NdotL <= 0.05f)
                     {
@@ -214,7 +204,7 @@
                     float3 diffuse = albedo * Lcolor * NdotL * shadowFactor;
 
                     // --- Sum light ---
-                    finalColor += (diffuse + specCol) * Lintens * attenuation;
+                    finalColor += (diffuse + specCol) * Lintens;
                 }
 
                 return float4(finalColor, 1);

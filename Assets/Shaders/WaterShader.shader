@@ -1,39 +1,52 @@
-Shader "Custom/Prac5Shader1"
+﻿Shader "Custom/WaterShader"
 {
     Properties
-    {       
+    {
         _tint ("Tint", Color) = (1,1,1,1)
-        _mainTexture ("Texture",2D) = "white" {}
-        _normalTex ("Normal Texture", 2D) = "bump" {}
-        _alphaCutoff("Alpha Cutoff", Range(0,1)) = 0.5
-        //_lightColor("Light Color", Color) = (1,1,1,1)
+        _NormalTex1 ("Normal texture 1", 2D) = "bump" {}
+        _NormalTex2 ("Normal texture 2", 2D) = "bump" {}
+        _NoiseTex ("Noise texture", 2D) = "white" {}
+        _Glossiness ("Smoothness", Range(0,1)) = 0.5
+        _Metallic ("Metallic", Range(0,1)) = 0.0
+        _NormalStrength ("Normal Strength", Range(0, 4)) = 1.0
+        _Scale ("Noise scale", Range(0.01, 0.1)) = 0.03
+        _Amplitude ("Amplitude", Range(0.01, 0.1)) = 0.015
+        _Speed ("Speed", Range(0.01, 0.3)) = 0.15
         _smoothness("Smoothness",Range(0,1)) = 0.5
         _specularStrength("Specular Strength", Range(0,1)) = 0.5
-        //_lightCounts("Light Counts", Integer) = 2
-        _NoiseTex ("Noise texture", 2D) = "white" {}
+        _SoftFactor("Soft Factor", Range(0.01, 3.0)) = 1.0
     }
-    
+
     SubShader
-    {
-         
-        Tags {"Queue" = "Geometry" "RenderType" = "Transparent"}
+    {   
+        Tags {"Queue" = "Transparent" "RenderType" = "Transparent"}
         Blend SrcAlpha OneMinusSrcAlpha
         Pass
         {
             HLSLPROGRAM
             #include "UnityCG.cginc"
+            #include "UnityStandardUtils.cginc"
 
             #pragma vertex MyVertexShader
             #pragma fragment MyFragmentShader
+            #pragma alpha vertex:vert
 
+
+            sampler2D _NormalTex1;
+            float4 _NormalTex1_ST;
+            sampler2D _NormalTex2;
+            float4 _NormalTex2_ST;
+            sampler2D _NoiseTex;
+            float _Scale;
+            float _Amplitude;
+            float _Speed;
+            float _NormalStrength;
+            float _SoftFactor;
+
+            half _Glossiness;
+            half _Metallic;
 
             uniform float4 _tint;
-            uniform sampler2D _mainTexture;
-            uniform float4 _mainTexture_ST;
-            uniform sampler2D _normalTex;
-            uniform float4 _normalTex_ST;
-            uniform float _NormalStrength;
-
             uniform float _alphaCutoff;
             uniform float4 _tiling;
             uniform float3 _lightPosition;
@@ -73,15 +86,32 @@ Shader "Custom/Prac5Shader1"
                 float4 shadowCoord: POSITION2;
             };
 
+            float3 UnpackNormalCustom(float4 packedNormal)
+            {
+                float3 normalTS = packedNormal.xyz * 2.0f - 1.0f;
+                return normalize(normalTS);
+            }
+
             vertex2Fragment MyVertexShader(vertexData vd)
             {
                 vertex2Fragment v2f;
-                v2f.position = UnityObjectToClipPos(vd.position);
-                v2f.worldPosition = mul(unity_ObjectToWorld,vd.position);
-                v2f.uv = TRANSFORM_TEX(vd.uv, _mainTexture);
-                v2f.shadowCoord = mul(_lightViewProj, float4(v2f.worldPosition, 1.0));
 
-                                //normal mapping
+                // --- Vertex displacement ---
+                float2 noiseUV = vd.uv * _Scale + _Time.y * _Speed;
+                float noise = tex2Dlod(_NoiseTex, float4(noiseUV, 0, 0)).r;
+
+                // Move vertex along normal or upward (choose one):
+                float3 offset = vd.normal * (noise * _Amplitude);
+
+                vd.position.xyz += offset;
+
+                // --- Standard transforms ---
+                v2f.position = UnityObjectToClipPos(vd.position);
+
+                v2f.uv = TRANSFORM_TEX(vd.uv, _NormalTex1);
+                v2f.worldPosition = mul(unity_ObjectToWorld, vd.position);
+
+                //normal mapping
                 float3 normalWS  = UnityObjectToWorldNormal(vd.normal);
                 float3 tangentWS = UnityObjectToWorldDir(vd.tangent.xyz);
                 float tangentSign = vd.tangent.w * unity_WorldTransformParams.w;
@@ -90,10 +120,10 @@ Shader "Custom/Prac5Shader1"
                 v2f.normalWorld  = normalWS;
                 v2f.tangentWorld = tangentWS;
                 v2f.bitangentWorld   = bitangentWS;
+
                 return v2f;
             }
 
-            
             float ShadowCalculation(float4 fragPosLightSpace)
             {
                 //transform shadow coordinates
@@ -109,32 +139,32 @@ Shader "Custom/Prac5Shader1"
 
                 return shadowFactor;
             }
-            
-            float PointShadowCalculation(float3 worldPos)
-            {
-                // 1. Vector from light to fragment
-                float3 L = worldPos - _lightPosition;
 
-                // 2. Current distance to fragment
-                float currentDepth = length(L);
-
-                float shadowDepth = 1.0 - texCUBE(_shadowCubeMap, normalize(L/currentDepth)).r;
-                    // 4. Decode depth (stored as [0..1] relative to far plane)
-                shadowDepth *= _shadowFarPlane;
-                float shadowFactor = (currentDepth - _shadowBias > shadowDepth) ? 1.0 : 0.0;
-                //flip the shadowFactor for proper shadowing
-                shadowFactor = saturate(1.0 - shadowFactor);
-
-                return shadowDepth;
-            }
             float4 MyFragmentShader(vertex2Fragment v2f) : SV_TARGET
             {
-                float3 normalTS = UnpackNormal(tex2D(_normalTex,v2f.uv));
+                //normal mapping and moving the normal textures
+                float normalUVX = v2f.uv.x + sin(_Time) * 5;
+                float normalUVY = v2f.uv.y + sin(_Time) * 5;
+
+                float2 normalUV1 = float2(normalUVX, v2f.uv.y);
+                float2 normalUV2 = float2(v2f.uv.x, normalUVY);
+
+                float4 nSample1 = tex2D(_NormalTex1, normalUV1);
+                float4 nSample2 = tex2D(_NormalTex2, normalUV2);
+
+                float3 n1 = UnpackNormal(nSample1);
+                float3 n2 = UnpackNormal(nSample2);
+
+                // Unity helper (from UnityStandardUtils.cginc)
+                float3 normalTS = BlendNormals(n1, n2);
                 normalTS.xy *= _NormalStrength;   // boost XY
                 normalTS = normalize(normalTS);
 
                 float3x3 TBN = float3x3(v2f.tangentWorld, v2f.bitangentWorld, v2f.normalWorld);
                 float3 normalWS = normalize(mul(normalTS, TBN));
+
+
+
 
                 float3 finalLightDirection;
                 if(_lightType == 0)
@@ -162,11 +192,11 @@ Shader "Custom/Prac5Shader1"
                 }
 
                 float toonSteps = 2;
-                float4 albedo = _tint * tex2D(_mainTexture, v2f.uv);
+                float4 albedo = _tint;// * tex2D(_mainTexture, v2f.uv);
 
                 normalWS = normalize(normalWS);
-                if(albedo.a < _alphaCutoff)
-                    discard;
+                // if(albedo.a < _alphaCutoff)
+                //     discard;
                 
                 float shadowFactor = ShadowCalculation(v2f.shadowCoord);
                 float3 viewDirection = normalize(_WorldSpaceCameraPos - v2f.worldPosition);
@@ -175,13 +205,16 @@ Shader "Custom/Prac5Shader1"
                 float specular = pow(float(saturate(dot(normalWS, halfVector))), _smoothness * 100);
                 float3 specularColor = specular * _specularStrength * _lightColor.rgb;
                 float amountOfLight = clamp(dot(normalWS, -finalLightDirection),0,1);
+                // if(amountOfLight ==0)
+                // {
+                //     amountOfLight += 0.2f;
+                //     }
                 float3 diffuse = albedo.xyz * _lightColor.rgb * amountOfLight;
-                float3 finalColor = (diffuse + specularColor) * _lightIntensity * attenuation * shadowFactor;
+                float3 finalColor = (diffuse + specularColor) * _lightIntensity * attenuation;
                 float4 result = float4(finalColor,albedo.w);
 
                 return result;
             }
-
             ENDHLSL
         }
     }
