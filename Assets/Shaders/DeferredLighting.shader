@@ -201,7 +201,7 @@
                         }
 
                     // --- Diffuse ---
-                    float3 diffuse = albedo * Lcolor * NdotL * shadowFactor;
+                    float3 diffuse = albedo * Lcolor * NdotL;
 
                     // --- Sum light ---
                     finalColor += (diffuse + specCol) * Lintens;
