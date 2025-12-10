@@ -291,23 +291,23 @@ public class DeferredRendererFeature : RenderPipeline
 
 
 
-        cmd = CommandBufferPool.Get("ForwardTransparentPass");
-        cmd.SetRenderTarget(camTarget, depth);   // render over lit opaque scene
-        cmd.SetViewport(camera.pixelRect);
-        context.ExecuteCommandBuffer(cmd);
-        cmd.Clear();
+        //cmd = CommandBufferPool.Get("ForwardTransparentPass");
+        //cmd.SetRenderTarget(camTarget, depth);   // render over lit opaque scene
+        //cmd.SetViewport(camera.pixelRect);
+        //context.ExecuteCommandBuffer(cmd);
+        //cmd.Clear();
 
-        // Sort + draw transparents
-        var forwardSorting = new SortingSettings(camera)
-        {
-            criteria = SortingCriteria.CommonTransparent
-        };
-        var forwardDrawing = new DrawingSettings(new ShaderTagId("ForwardTransparent"), forwardSorting);
-        var forwardFiltering = new FilteringSettings(RenderQueueRange.transparent);
+        //// Sort + draw transparents
+        //var forwardSorting = new SortingSettings(camera)
+        //{
+        //    criteria = SortingCriteria.CommonTransparent
+        //};
+        //var forwardDrawing = new DrawingSettings(new ShaderTagId("ForwardTransparent"), forwardSorting);
+        //var forwardFiltering = new FilteringSettings(RenderQueueRange.transparent);
 
-        context.DrawRenderers(cullResults, ref forwardDrawing, ref forwardFiltering);
+        //context.DrawRenderers(cullResults, ref forwardDrawing, ref forwardFiltering);
 
-        CommandBufferPool.Release(cmd);
+        //CommandBufferPool.Release(cmd);
 
         //cmd = CommandBufferPool.Get("FinalBlit");
         //cmd.Blit(lightingResultRT, camTarget);
