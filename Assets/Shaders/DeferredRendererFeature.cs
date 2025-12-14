@@ -12,6 +12,20 @@ public class DeferredRendererFeature : RenderPipeline
     private Material lightingMaterial;
     private Material debugBlitMaterial;
 
+    private const int MaxLights = 100;
+    private readonly Vector4[] _lightPositions = new Vector4[MaxLights];
+    private readonly Vector4[] _lightDirections = new Vector4[MaxLights];
+    private readonly Vector4[] _lightColors = new Vector4[MaxLights];
+    private readonly Vector4[] _lightIntensities = new Vector4[MaxLights];
+    private readonly Vector4[] _lightTypes = new Vector4[MaxLights];
+    private readonly Vector4[] _lightAttenuations = new Vector4[MaxLights];
+    private readonly Vector4[] _lightSpotData = new Vector4[MaxLights];
+    private readonly Vector4[] _lightSpecularStrength = new Vector4[MaxLights];
+    private readonly Vector4[] _lightRange = new Vector4[MaxLights];
+    private readonly Vector4[] _lightSmoothness = new Vector4[MaxLights];
+
+    private RenderTexture _directionalShadowMap;
+    private const int ShadowMapSize = 2048;
 
     enum ShadowTextureType
     {
@@ -48,6 +62,27 @@ public class DeferredRendererFeature : RenderPipeline
         {
             RenderCamera(context, cam);
         }
+    }
+    private void EnsureDirectionalShadowMap()
+    {
+        if (_directionalShadowMap != null &&
+            _directionalShadowMap.width == ShadowMapSize &&
+            _directionalShadowMap.height == ShadowMapSize)
+            return;
+
+        if (_directionalShadowMap != null)
+        {
+            _directionalShadowMap.Release();
+            _directionalShadowMap = null;
+        }
+
+        _directionalShadowMap = new RenderTexture(ShadowMapSize, ShadowMapSize, 0, RenderTextureFormat.RFloat)
+        {
+            filterMode = FilterMode.Bilinear,
+            wrapMode = TextureWrapMode.Clamp,
+            name = "DirectionalShadowMap"
+        };
+        _directionalShadowMap.Create();
     }
 
     private void RenderCamera(ScriptableRenderContext context, Camera camera)
@@ -105,95 +140,74 @@ public class DeferredRendererFeature : RenderPipeline
             new RenderTargetIdentifier(g2)
         };
         //reg all lights
-        var indivLights = GameObject.FindObjectsByType<IndivLightObject>(FindObjectsSortMode.None);
-
-        // TEMP: support up to 32 lights
-        int count = Mathf.Min(indivLights.Length, 32);
-
-        Vector4[] positions = new Vector4[32];
-        Vector4[] directions = new Vector4[32];
-        Vector4[] colors = new Vector4[32];
-        Vector4[] intensities = new Vector4[32];
-        Vector4[] types = new Vector4[32];
-        Vector4[] radii = new Vector4[32];     // NEW: range for point/spot lights
-        Vector4[] spotData = new Vector4[32];     // NEW: spot angles
-        Vector4[] specularStrengths = new Vector4[32];
-        Vector4[] smoothnessValues = new Vector4[32];
-
+        var indivLights = DefferedLighObj.All;
+        int count = Mathf.Min(indivLights.Count, MaxLights);
         CommandBuffer cmd = CommandBufferPool.Get("ShadowPass");
 
-        shadowCount = 0;
-        for (int i = 0; i < indivLights.Length; i++)
-        {
-            var L = indivLights[i];
-            if (L.type != IndivLightObject.Type.direction) continue;
+        //shadowCount = 0;
+        //for (int i = 0; i < count; i++)
+        //{
+        //    var L = indivLights[i];
+        //    if (L.type != DefferedLighObj.Type.direction) continue;
 
-            var rt = new RenderTexture(2048, 2048, 0, RenderTextureFormat.RFloat);
+        //    // For now: use only the first directional light for shadows
+        //    EnsureDirectionalShadowMap();
 
-            rt.filterMode = FilterMode.Bilinear;
-            rt.wrapMode = TextureWrapMode.Clamp;
-            rt.Create();
+        //    // Build VP from light POV
+        //    float3 pos = L.transform.position;
+        //    float3 target = L.direction.normalized;
 
-            // Build VP from light POV
-            float3 pos = L.transform.position;
-            float3 target = L.direction.normalized;
+        //    float3 referenceUp = Vector3.up;
+        //    if (Mathf.Abs(Vector3.Dot(target, referenceUp)) > 0.99f)
+        //        referenceUp = Vector3.forward;
 
-            // Choose a reference up that’s not parallel to lightDir
-            float3 referenceUp = Vector3.up;
-            if (Mathf.Abs(Vector3.Dot(target, referenceUp)) > 0.99f)
-                referenceUp = Vector3.forward;
+        //    Vector3 right = Vector3.Normalize(Vector3.Cross(referenceUp, target));
+        //    Vector3 up = Vector3.Cross(target, right);
+        //    up = L.transform.up; // your original override
 
-            // Build an orthonormal basis that tries to keep up near world up
-            Vector3 right = Vector3.Normalize(Vector3.Cross(referenceUp, target));
-            Vector3 up = Vector3.Cross(target, right);
-            up = L.transform.up;
-            // Choose where the light camera sits (for directional light, fake it)
-            float3 focus = pos;   // region we care about
-            float shadowDistance = 50f;
-            float3 lightPos = focus;
+        //    float3 focus = pos;
+        //    float shadowDistance = 50f;
+        //    float3 lightPos = focus;
 
-            // View / proj
-            Matrix4x4 view = Matrix4x4.LookAt(lightPos, lightPos + target, up);
+        //    Matrix4x4 view = Matrix4x4.LookAt(lightPos, lightPos + target, up);
 
-            float halfSize = 30f;
-            float near = 0.1f;
-            float far = shadowDistance * 2f;
+        //    float halfSize = 30f;
+        //    float near = 0.1f;
+        //    float far = shadowDistance * 2f;
 
-            Matrix4x4 proj = Matrix4x4.Ortho(-halfSize, halfSize, -halfSize, halfSize, near, far);
-            proj = GL.GetGPUProjectionMatrix(proj, true);
+        //    Matrix4x4 proj = Matrix4x4.Ortho(-halfSize, halfSize, -halfSize, halfSize, near, far);
+        //    proj = GL.GetGPUProjectionMatrix(proj, true);
 
-            Matrix4x4 vp = proj * view;
+        //    Matrix4x4 vp = proj * view;
 
-            shadowDatas[shadowCount].shadowTex = rt;
-            shadowDatas[shadowCount].lightVP = vp;
+        //    shadowDatas[shadowCount].shadowTex = _directionalShadowMap;
+        //    shadowDatas[shadowCount].lightVP = vp;
 
-            // Bind depth-only target
-            cmd.SetRenderTarget(rt);
-            cmd.ClearRenderTarget(true, false, Color.clear);
-            cmd.SetGlobalMatrix("_LightVP", vp);
-            cmd.SetGlobalVector("_LightPos", L.transform.position);
-            cmd.SetGlobalMatrix("_LightView", view);
+        //    // Bind depth-only target
+        //    cmd.SetRenderTarget(_directionalShadowMap);
+        //    cmd.ClearRenderTarget(true, false, Color.clear);
+        //    cmd.SetGlobalMatrix("_LightVP", vp);
+        //    cmd.SetGlobalVector("_LightPos", L.transform.position);
+        //    cmd.SetGlobalMatrix("_LightView", view);
 
-            // MUST EXECUTE this before DrawRenderers
-            context.ExecuteCommandBuffer(cmd);
-            cmd.Clear();
+        //    context.ExecuteCommandBuffer(cmd);
+        //    cmd.Clear();
 
+        //    var sort = new SortingSettings(camera);
+        //    var draw = new DrawingSettings(new ShaderTagId("ShadowCaster"), sort);
+        //    var filter = new FilteringSettings(RenderQueueRange.all);
 
-            // Draw all objects using ShadowCaster pass
-            var sort = new SortingSettings(camera);
-            var draw = new DrawingSettings(new ShaderTagId("ShadowCaster"), sort);
-            var filter = new FilteringSettings(RenderQueueRange.all);
+        //    context.DrawRenderers(cullResults, ref draw, ref filter);
 
-            context.DrawRenderers(cullResults, ref draw, ref filter);
-            rt.Release();
-            shadowCount++;
-        }
-        // Set texture + matrix
-        if (shadowCount > 0)
-        {
-            cmd.SetGlobalTexture("_ShadowMap", shadowDatas[0].shadowTex);
-            cmd.SetGlobalMatrix("_LightVP", shadowDatas[0].lightVP);
-        }
+        //    shadowCount++;
+        //    break; // only one directional shadow for now
+        //}
+        //// Set texture + matrix
+        //if (shadowCount > 0)
+        //{
+        //    cmd.SetGlobalTexture("_ShadowMap", shadowDatas[0].shadowTex);
+        //    cmd.SetGlobalMatrix("_LightVP", shadowDatas[0].lightVP);
+        //}
 
         // Execute and release
         context.ExecuteCommandBuffer(cmd);
@@ -242,39 +256,36 @@ public class DeferredRendererFeature : RenderPipeline
          
         //Lights 
         {
-            // fill arrays
             for (int i = 0; i < count; i++)
             {
                 var L = indivLights[i];
 
-                positions[i] = L.transform.position;
-                directions[i] = L.direction.normalized;
-                colors[i] = new Vector4(L.lightColor.r, L.lightColor.g, L.lightColor.b, 1);
-                intensities[i] = new Vector4(L.intensity, 0, 0, 0);
-
-                types[i] = new Vector4((int)L.type, 0, 0, 0);
-
-                radii[i] = new Vector4(L.attenuation.x, L.attenuation.y, L.attenuation.z, 0);
-
-                spotData[i] = new Vector4(L.spotLightInnerCutOff, L.spotLightCutOff, 0, 0);
-
-                specularStrengths[i] = new Vector4(L.specularStrength, 0, 0, 0);
-                smoothnessValues[i] = new Vector4(L.smoothness, 0, 0, 0);
+                _lightPositions[i] = L.transform.position;
+                _lightDirections[i] = L.direction.normalized;
+                _lightColors[i] = new Vector4(L.lightColor.r, L.lightColor.g, L.lightColor.b, 1);
+                _lightIntensities[i] = new Vector4(L.intensity, 0, 0, 0);
+                _lightTypes[i] = new Vector4((int)L.type, 0, 0, 0);
+                _lightAttenuations[i] = new Vector4(L.attenuation.x, L.attenuation.y, L.attenuation.z, 0);
+                _lightSpotData[i] = new Vector4(L.spotLightInnerCutOff, L.spotLightCutOff, 0, 0);
+                _lightSpecularStrength[i] = new Vector4(L.specularStrength, 0, 0, 0);
+                _lightRange[i] = new Vector4(L.range, 0, 0, 0);
+                _lightSmoothness[i] = new Vector4(L.smoothness, 0, 0, 0);
             }
 
             // send to shader
             cmd.SetGlobalInt("_LightCount", count);
-            cmd.SetGlobalVectorArray("_LightPositions", positions);
-            cmd.SetGlobalVectorArray("_LightDirections", directions);
-            cmd.SetGlobalVectorArray("_LightColors", colors);
-            cmd.SetGlobalVectorArray("_LightIntensities", intensities);
-            cmd.SetGlobalVectorArray("_LightTypes", types);
-            cmd.SetGlobalVectorArray("_LightSpecularStrength", specularStrengths);
-            cmd.SetGlobalVectorArray("_LightSmoothness", smoothnessValues);
+            cmd.SetGlobalVectorArray("_LightPositions", _lightPositions);
+            cmd.SetGlobalVectorArray("_LightDirections", _lightDirections);
+            cmd.SetGlobalVectorArray("_LightColors", _lightColors);
+            cmd.SetGlobalVectorArray("_LightIntensities", _lightIntensities);
+            cmd.SetGlobalVectorArray("_LightTypes", _lightTypes);
+            cmd.SetGlobalVectorArray("_LightSpecularStrength", _lightSpecularStrength);
+            cmd.SetGlobalVectorArray("_LightSmoothness", _lightSmoothness);
+            cmd.SetGlobalVectorArray("_LightRange", _lightRange);
 
-            // if you want attenuation and spot info:
-            cmd.SetGlobalVectorArray("_LightAttenuations", radii);
-            cmd.SetGlobalVectorArray("_SpotAngles", spotData);
+            // attenuation + spot info
+            cmd.SetGlobalVectorArray("_LightAttenuations", _lightAttenuations);
+            cmd.SetGlobalVectorArray("_SpotAngles", _lightSpotData);
         }
 
         // render to the camera target
@@ -331,29 +342,29 @@ public class DeferredRendererFeature : RenderPipeline
         context.DrawGizmos(camera, GizmoSubset.PostImageEffects);
 
 
-        cmd = CommandBufferPool.Get("Debug GBuffer View");
+        //cmd = CommandBufferPool.Get("Debug GBuffer View");
 
-        float fullW = camera.pixelWidth;
-        float fullH = camera.pixelHeight;
-        float thirdH = fullH / 3f;
+        //float fullW = camera.pixelWidth;
+        //float fullH = camera.pixelHeight;
+        //float thirdH = fullH / 3f;
 
-        // --- GBUFFER 0 (top) ---
-        cmd.SetViewport(new Rect(0, fullH - thirdH, fullW / 2, thirdH));
-        cmd.SetGlobalTexture("_SourceTex", g0);
-        cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+        //// --- GBUFFER 0 (top) ---
+        //cmd.SetViewport(new Rect(0, fullH - thirdH, fullW / 2, thirdH));
+        //cmd.SetGlobalTexture("_SourceTex", g0);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
 
-        // --- GBUFFER 1 (middle) ---
-        cmd.SetViewport(new Rect(0, fullH - thirdH * 2f, fullW / 2, thirdH));
-        cmd.SetGlobalTexture("_SourceTex", g1);
-        cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+        //// --- GBUFFER 1 (middle) ---
+        //cmd.SetViewport(new Rect(0, fullH - thirdH * 2f, fullW / 2, thirdH));
+        //cmd.SetGlobalTexture("_SourceTex", g1);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
 
-        // --- GBUFFER 2 (bottom) ---
-        cmd.SetViewport(new Rect(0, 0, fullW / 2, thirdH));
-        cmd.SetGlobalTexture("_SourceTex", shadowDatas[0].shadowTex);
-        cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
+        //// --- GBUFFER 2 (bottom) ---
+        //cmd.SetViewport(new Rect(0, 0, fullW / 2, thirdH));
+        //cmd.SetGlobalTexture("_SourceTex", shadowDatas[0].shadowTex);
+        //cmd.DrawProcedural(Matrix4x4.identity, debugBlitMaterial, 0, MeshTopology.Triangles, 3, 1);
 
-        context.ExecuteCommandBuffer(cmd);
-        CommandBufferPool.Release(cmd);
+        //context.ExecuteCommandBuffer(cmd);
+        //CommandBufferPool.Release(cmd);
 
 
 

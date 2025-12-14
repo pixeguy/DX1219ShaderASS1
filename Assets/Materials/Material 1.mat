@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: Material
+  m_Name: Material 1
   m_Shader: {fileID: 4800000, guid: 5f535ccfa5fcb3a47916229872a346bc, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -73,7 +73,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _mainTexture:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: e3b6f3d94d7443b41be724cb36fcab64, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _normalTex:
@@ -131,9 +131,8 @@ Material:
     - _ZWrite: 1
     - _alphaCutoff: 0.033
     - _lightIntensity: 0.93
-    - _shadowRadius: 0
-    - _smoothness: 0.025
-    - _specularStrength: 0
+    - _smoothness: 0.017
+    - _specularStrength: 1
     - _spotLightCutOff: 31
     - _spotLightInnerCutOff: 31
     m_Colors:
@@ -146,7 +145,7 @@ Material:
     - _lightDirection: {r: 0, g: -1, b: 0, a: 0}
     - _lightPosition: {r: -9.62, g: 9.17, b: -19.67, a: 0}
     - _tiling: {r: 1, g: 1, b: 0, a: 0}
-    - _tint: {r: 0, g: 1, b: 0.05781889, a: 1}
+    - _tint: {r: 1, g: 1, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
 --- !u!114 &3780892640186587452

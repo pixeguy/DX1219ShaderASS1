@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+
 [ExecuteAlways]
 public class GradientToTex : MonoBehaviour
 {

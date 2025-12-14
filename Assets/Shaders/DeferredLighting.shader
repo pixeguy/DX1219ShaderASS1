@@ -11,32 +11,34 @@
 
             HLSLPROGRAM
             #include "UnityCG.cginc"
+            #define MAX_LIGHTS 200   
 
             #pragma vertex Vert
             #pragma fragment Frag
 
-            sampler2D _GBuffer0;  // Albedo + Roughness (A ignored)
-            sampler2D _GBuffer1;  // Normal + Metallic (A ignored)
+            sampler2D _GBuffer0;  // Albedo + Roughness 
+            sampler2D _GBuffer1;  // Normal + Metallic 
             sampler2D _GBuffer2; //worldPos
 
             int _LightCount;
 
-            float4 _LightPositions[32];    // xyz = position
-            float4 _LightDirections[32];   // xyz = direction
-            float4 _LightColors[32];       // rgb = color
-            float4 _LightIntensities[32];  // x = intensity
-            float4 _LightTypes[32];        // x = type (0,1,2)
-            float4 _LightAttenuations[32]; // x,y,z = attenuation constants
-            float4 _SpotAngles[32];        // x = inner angle, y = outer angle
-            float4 _LightSpecularStrength[32]; // x = specularStrength
-            float4 _LightSmoothness[32];       // x = smoothness
+            float4 _LightPositions[MAX_LIGHTS];  
+            float4 _LightDirections[MAX_LIGHTS];   
+            float4 _LightColors[MAX_LIGHTS];     
+            float4 _LightIntensities[MAX_LIGHTS];  
+            float4 _LightTypes[MAX_LIGHTS];        
+            float4 _LightAttenuations[MAX_LIGHTS]; 
+            float4 _SpotAngles[MAX_LIGHTS];        // x = inner angle, y = outer angle
+            float4 _LightSpecularStrength[MAX_LIGHTS]; 
+            float4 _LightSmoothness[MAX_LIGHTS];      
+            float4 _LightRange[MAX_LIGHTS];       
 
             sampler2D _ShadowMap;
             float4x4 _LightVP;
 
             sampler2D _CameraDepthTexture;
-            float4x4 _CameraInverseProjection;   // from C#
-            float4x4 _CameraInverseView;         // from C#
+            float4x4 _CameraInverseProjection;  
+            float4x4 _CameraInverseView;        
 
             struct Varyings
             {
@@ -44,7 +46,6 @@
                 float2 uv  : TEXCOORD0;
             };
 
-            // Fullscreen triangle vertex shader
             Varyings Vert(uint vertexID : SV_VertexID)
             {
                 Varyings o;
@@ -57,7 +58,7 @@
 
                 o.pos = float4(pos[vertexID], 0, 1);
 
-                // Convert clip-space to UV 0..1
+                // convert clip-space to UV 0..1
                 o.uv = pos[vertexID] * 0.5 + 0.5;
 
                 return o;
@@ -92,20 +93,21 @@
                 float4 g2 = tex2D(_GBuffer2, i.uv);
 
                 float3 albedo = g0.rgb;
-                float smoothness = g0.a;   // if you stored it
-                float metallic = g1.a;     // if you stored it
+                float smoothness = g0.a;   
+                float metallic = g1.a;     
 
                 float3 normal = normalize(g1.rgb * 2 - 1);
 
-                // Until we reconstruct from depth
-                //float depth = tex2D(_CameraDepthTexture, i.uv).r;
                 float3 worldPos = g2.xyz;
 
                 float3 finalColor = 0;
 
-                [unroll]
-                for (int idx = 0; idx < _LightCount; idx++)
+                [loop]
+                for (int idx = 0; idx < MAX_LIGHTS; idx++)
                 {
+                    if (idx >= _LightCount)
+                        break;
+
                     int type = (int)_LightTypes[idx].x;
 
                     float3 Lpos    = _LightPositions[idx].xyz;
@@ -116,6 +118,7 @@
                     float3 atten   = _LightAttenuations[idx].xyz;
                     float  inner   = radians(_SpotAngles[idx].x);
                     float  outer   = radians(_SpotAngles[idx].y);
+                    float range = _LightRange[idx].x;
 
                     float3 finalLightDir = 0;
                     float attenuation = 1.0;
@@ -139,13 +142,22 @@
                     }
                     else if (type == 1)       // Point
                     {
-                        float3 toLight = Lpos - worldPos;   // FIXED
+                        float3 toLight = Lpos - worldPos;   
                         float dist = length(toLight);
 
-                        finalLightDir = normalize(toLight); // FIXED
+                        if (dist > range)
+                            continue;
+
+                        finalLightDir = normalize(toLight); 
                         NdotL = saturate(dot(normal, finalLightDir));
 
-                        attenuation = 1.0 / (atten.x + atten.y * dist + atten.z * dist * dist);
+                        float att = 1.0 / (atten.x + atten.y * dist + atten.z * dist * dist);
+
+                        float edgeStart = range * 0.7;
+                        float rangeT     = saturate((dist - edgeStart) / (range - edgeStart));
+                        float rangeFade  = 1.0 - rangeT;        // 1 → 0 near edge
+                        rangeFade        = rangeFade * rangeFade; // optional: square for smoother curve
+                        attenuation = att * rangeFade;
                     }
                     else if (type == 2)       // Spot
                     {
@@ -195,16 +207,16 @@
                     float spec = pow(saturate(dot(normal, halfVec)), Lsmooth * 100);
                     float3 specCol = spec * LspecStrength * Lcolor;
 
-                    if (NdotL <= 0.05f)
-                    {
-                        NdotL = 0.05f;
-                        }
+                    // if (NdotL <= 0.05f)
+                    // {
+                    //     NdotL = 0.05f;
+                    //     }
 
                     // --- Diffuse ---
                     float3 diffuse = albedo * Lcolor * NdotL;
 
                     // --- Sum light ---
-                    finalColor += (diffuse + specCol) * Lintens;
+                    finalColor += (diffuse + specCol) * Lintens * attenuation;
                 }
 
                 return float4(finalColor, 1);

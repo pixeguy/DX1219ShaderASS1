@@ -1,16 +1,17 @@
-﻿Shader "Custom/Prac5Shader1"
+Shader "Custom/MaterialisationShader"
 {
     Properties
     {       
         _tint ("Tint", Color) = (1,1,1,1)
         _mainTexture ("Texture",2D) = "white" {}
         _normalTex ("Normal Texture", 2D) = "bump" {}
-        _alphaCutoff("Alpha Cutoff", Range(0,1)) = 0.5
         //_lightColor("Light Color", Color) = (1,1,1,1)
         _smoothness("Smoothness",Range(0,1)) = 0.5
         _specularStrength("Specular Strength", Range(0,1)) = 0.5
-        _NoiseTex ("Noise texture", 2D) = "white" {}
-        _shadowRadius("Smoothness",Float) = 0.5
+        _noiseTex ("Noise texture", 2D) = "white" {}
+        _emissionColor ("Emission", Color) = (1,1,1,1)
+        _dissolveSpeed ("Dissolve Speed", Float) = 1
+
     }
     
     SubShader
@@ -33,6 +34,9 @@
             uniform sampler2D _normalTex;
             uniform float4 _normalTex_ST;
             uniform float _NormalStrength;
+            sampler2D _noiseTex;
+            float4 _noiseTex_ST;
+            float4 _emissionColor;
 
             uniform float _alphaCutoff;
             uniform float4 _tiling;
@@ -58,7 +62,11 @@
             float4 _shadowAtlasUV[MAX_LIGHTS];
             float _shadowBias;
             float _ShadowAtlasSize; 
-            float _shadowRadius;
+
+            float _dissolveSpeed;
+            sampler2D _emissionColorRT;
+            float4 sampler_emissionColorRT;
+
 
             struct vertexData
             {
@@ -107,7 +115,7 @@
                 float4 rect = _shadowAtlasUV[lightIndex]; 
                 float2 localUV = shadowCoord.xy;
                 float2 atlasUV = localUV * rect.xy + rect.zw;
-
+                
                 float2 texelUV = 1.5f / 4096; 
                 float refSize = 30;
                 float size = refSize / _camSize[lightIndex];
@@ -122,7 +130,7 @@
                     [unroll]
                     for (int y = -2; y <= 2; y++)
                     {
-                        float2 offset = float2(x, y) * texel * _shadowRadius;
+                        float2 offset = float2(x, y) * texel;
                         float2 uv = atlasUV + offset;
 
                         float storedDepth = tex2D(_ShadowAtlas, uv).r; 
@@ -155,13 +163,45 @@
 
                 float3x3 TBN = float3x3(v2f.tangentWorld, v2f.bitangentWorld, v2f.normalWorld);
                 float3 normalWS = normalize(mul(normalTS, TBN));
-                 float toonSteps = 2;
+
                 float4 albedo = _tint * tex2D(_mainTexture, v2f.uv);
+
+
+                float2 noiseUV = v2f.uv * _noiseTex_ST.xy + _noiseTex_ST.zw;
+                float noise = tex2D(_noiseTex, noiseUV).r;
+
+
+                float t = sin(_Time.y * _dissolveSpeed);
+                float remapped = (t + 0.9) * 0.9;
+                float height = saturate(v2f.uv.y);
+                float heightCutOff = remapped - height;
+                heightCutOff = saturate(heightCutOff);
+
+                float dissolveMask = step(noise, heightCutOff);
+
+                float alpha = albedo.a * dissolveMask;
+                clip(alpha - 0.001);
+
+                float edgeWidth = 0.09;
+                float outer = step(noise, saturate(heightCutOff + edgeWidth));
+                float inner = step(noise, saturate(heightCutOff - edgeWidth));
+                float edgeMask = outer - inner;
+                edgeMask *= (1.0 - t);
+                if (edgeMask > 0) {
+                    float gradientU = saturate(v2f.uv.y);      // or noise / remapped t
+                    float2 gradientUV = float2(gradientU, 0.5);
+                    float3 edgeColor = tex2D(_emissionColorRT, gradientUV).rgb;
+
+                    return float4(edgeColor * 10, 1);    
+                }
+
+                float3 baseColor = albedo.rgb * dissolveMask;
+                albedo = float4(baseColor, alpha);
+
 
                 normalWS = normalize(normalWS);
                 if(albedo.a < _alphaCutoff)
                     discard;
-
                     
                 float4 final = float4(0,0,0,0);
 
@@ -184,7 +224,7 @@
                         float edgeStart = _ranges[i] * 0.7;
                         float rangeT     = saturate((distance - edgeStart) / (_ranges[i] - edgeStart));
                         float rangeFade  = 1.0 - rangeT;       
-                        rangeFade        = rangeFade * rangeFade; 
+                        rangeFade        = rangeFade * rangeFade;
                         attenuation[i] = attenuation[i] * rangeFade;
                     }
                     else if (_lightType[i] == 2)
@@ -217,7 +257,7 @@
                     float3 specularColor = specular * _specularStrength * _lightColor[i].rgb;
                     float amountOfLight = clamp(dot(normalWS, -finalLightDirection),0,1);
                     float3 diffuse = albedo.xyz * _lightColor[i].rgb * amountOfLight;
-                    float3 finalColor = (diffuse + specularColor) * _lightIntensity[i] * attenuation[i] * shadowFactor;
+                    float3 finalColor = (diffuse + specularColor) * _lightIntensity[i] * attenuation[i]* shadowFactor;
                     float4 result = float4(finalColor,albedo.w);
                     final += result;
                 }
