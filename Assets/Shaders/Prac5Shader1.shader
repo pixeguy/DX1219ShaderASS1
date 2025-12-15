@@ -59,6 +59,8 @@
             float _shadowBias;
             float _ShadowAtlasSize; 
             float _shadowRadius;
+            float _ambientLightStrength;
+            float4 _ambientLightCol;
 
             struct vertexData
             {
@@ -108,19 +110,21 @@
                 float2 localUV = shadowCoord.xy;
                 float2 atlasUV = localUV * rect.xy + rect.zw;
 
-                float2 texelUV = 1.5f / 4096; 
-                float refSize = 30;
+                float2 texelUV = 1.5f / 1024; 
+                float refSize = 200;
                 float size = refSize / _camSize[lightIndex];
-                float2 texel = texelUV * size;
+                float2 texel = texelUV;//* size;
                 float currentDepth = shadowCoord.z;
 
                 float sumLit = 0.0;
                 int samples = 0;
+
+
                 [unroll]
-                for (int x = -2; x <= 2; x++)
+                for (int x = -1; x <= 1; x++)
                 {
                     [unroll]
-                    for (int y = -2; y <= 2; y++)
+                    for (int y = -1; y <= 1; y++)
                     {
                         float2 offset = float2(x, y) * texel * _shadowRadius;
                         float2 uv = atlasUV + offset;
@@ -157,13 +161,13 @@
                 float3 normalWS = normalize(mul(normalTS, TBN));
                  float toonSteps = 2;
                 float4 albedo = _tint * tex2D(_mainTexture, v2f.uv);
-
+                float4 ambient = _ambientLightCol * _ambientLightStrength;
                 normalWS = normalize(normalWS);
                 if(albedo.a < _alphaCutoff)
                     discard;
 
                     
-                float4 final = float4(0,0,0,0);
+                float3 final = albedo.rgb * ambient.rgb;
 
                 for(int i = 0; i < _lightCount; i++){
                     float3 finalLightDirection;
@@ -218,7 +222,7 @@
                     float amountOfLight = clamp(dot(normalWS, -finalLightDirection),0,1);
                     float3 diffuse = albedo.xyz * _lightColor[i].rgb * amountOfLight;
                     float3 finalColor = (diffuse + specularColor) * _lightIntensity[i] * attenuation[i] * shadowFactor;
-                    float4 result = float4(finalColor,albedo.w);
+                    float3 result = finalColor;
                     final += result;
                 }
                 return float4(final.xyz, albedo.a);

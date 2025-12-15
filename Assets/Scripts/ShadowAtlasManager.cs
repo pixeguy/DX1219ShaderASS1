@@ -7,7 +7,7 @@ public class ShadowAtlasManager : MonoBehaviour
     [Header("Atlas Settings")]
     public int atlasSize = 4096;   
     public int tilesPerRow = 4; // 4x4 grid
-    public const int maxLights = 10;
+    public const int maxLights = 10; //just follow everywhere else, shaders and all use this number even tho is 4x4
 
     public RenderTexture Atlas { get; private set; }
 
@@ -28,6 +28,7 @@ public class ShadowAtlasManager : MonoBehaviour
         }
         Instance = this;
 
+        //ues ARGB32 because, if using depth: tiling of the uv of multiple shadowmap dont work
         Atlas = new RenderTexture(atlasSize, atlasSize, 24, RenderTextureFormat.ARGB32);
         Atlas.useMipMap = false;
         Atlas.autoGenerateMips = false;
@@ -43,7 +44,7 @@ public class ShadowAtlasManager : MonoBehaviour
     {
         if (lightCount >= maxLights)
         {
-            Debug.LogWarning("Max light count reached for shadow atlas");
+            Debug.Log("max lights reached");
             return -1;
         }
 
@@ -60,10 +61,10 @@ public class ShadowAtlasManager : MonoBehaviour
 
         if (y >= tilesPerRow)
         {
-            Debug.LogWarning("Not enough tiles in shadow atlas grid!");
+            Debug.Log("not enough tiles on atlas grid");
             return new Rect(0, 0, 0, 0);
         }
-
+        //(offsetX, offsetY, scaleX, scaleY)
         return new Rect(x * tileSize, y * tileSize, tileSize, tileSize);
     }
 
@@ -93,7 +94,7 @@ public class ShadowAtlasManager : MonoBehaviour
 
         foreach (var sr in shadowRenderers)
         {
-            if (sr == null) continue;
+            if (sr == null) continue; //updating all shadowmap renderers
             sr.RenderShadow();
         }
 

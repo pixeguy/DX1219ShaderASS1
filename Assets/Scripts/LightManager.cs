@@ -7,7 +7,7 @@ public class LightManager : MonoBehaviour
     private IndivLightObject[] allLights;
     public const int count = 10;
 
-
+    //keep lights outside so i always pass in the same array size
     Vector4[] positions = new Vector4[count];
     Vector4[] directions = new Vector4[count];
     Color[] colors = new Color[count];

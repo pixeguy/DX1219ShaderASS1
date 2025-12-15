@@ -10,8 +10,8 @@ public class ShadowMapRenderer : MonoBehaviour
     private Camera lightCamera;
     public Material depthMaterial;
     // Atlas data
-    private Rect atlasViewport;           // in [0,1] screen-rect for camera
-    private Vector4 atlasUVScaleOffset;   // (scaleX, scaleY, offsetX, offsetY)
+    private Rect atlasViewport;
+    private Vector4 atlasUVScaleOffset;   // (offsetX, offsetY, scaleX, scaleY)
     private int lightIndex = -1;
 
     private void Start()
@@ -19,25 +19,25 @@ public class ShadowMapRenderer : MonoBehaviour
         lightObject = GetComponent<IndivLightObject>();
         if (lightObject == null)
         {
-            Debug.LogError("ShadowMapRenderer requires an IndivLightObject on the same GameObject.");
+            Debug.Log("ShadowMapRenderer have no light");
             enabled = false;
             return;
         }
 
         if (ShadowAtlasManager.Instance == null)
         {
-            Debug.LogError("No ShadowAtlasManager in scene!");
+            Debug.Log("no atlas manager");
             enabled = false;
             return;
         }
-        lightIndex = ShadowAtlasManager.Instance.RegisterLight();
+        lightIndex = ShadowAtlasManager.Instance.RegisterLight(); //atlas manager will give light their index
         if (lightIndex < 0)
         {
             enabled = false;
             return;
         }
 
-        lightObject.shadowIndex = lightIndex;
+        lightObject.shadowIndex = lightIndex; //for light manager
         if (lightIndex < 0)
         {
             enabled = false;
@@ -85,6 +85,7 @@ public class ShadowMapRenderer : MonoBehaviour
         atlasViewport = ShadowAtlasManager.Instance.AllocateTileForIndex(lightIndex);
         lightCamera.rect = atlasViewport;
 
+        // sets where in [0-1] space the shadowmap will be on the atlas
         atlasUVScaleOffset = new Vector4(
             atlasViewport.width,
             atlasViewport.height,
