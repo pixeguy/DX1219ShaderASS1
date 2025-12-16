@@ -1,0 +1,9 @@
+fileFormatVersion: 2
+guid: 80dd1b1397e4f5647a2b6560d01208d2
+ShaderImporter:
+  externalObjects: {}
+  defaultTextures: []
+  nonModifiableTextures: []
+  userData: '{"shaderPath":"Custom/TerrainShader","attributes":[{"isBaseTexture":false,"channel":4,"index":0,"range":{"x":0.0,"y":1.0},"propertyTarget":"_mainTexture","mask":0},{"isBaseTexture":false,"channel":4,"index":1,"range":{"x":0.0,"y":1.0},"propertyTarget":"_normalTex","mask":0}]}'
+  assetBundleName: 
+  assetBundleVariant: 
